@@ -161,6 +161,7 @@ Recommended GitHub secrets and variables:
 | `ANTHROPIC_API_KEY` | Reachable Claude provider and Claude Code auth. |
 | `OPENAI_API_KEY` | Reachable OpenAI provider and OpenAI-backed agents. |
 | `GROQ_API_KEY` | Reachable Groq provider. |
+| `GROK_API_KEY` | Legacy typo alias; the workflow maps it to `GROQ_API_KEY` if needed. |
 | `DEEPSEEK_API_KEY` | Direct DeepSeek-compatible agent/provider setups. |
 | `MOONSHOT_API_KEY` | Direct Moonshot-compatible agent/provider setups. |
 | `XAI_API_KEY` | xAI/Grok-compatible provider setups. |
