@@ -190,7 +190,9 @@ The Actions log prints `Reachable cache active` before the baseline scan. A
 warm run says `warm cache restored`; the first run says `cold start` and then
 populates the cache for the next run. This keeps repeat CI scans fast by
 preserving scanner databases, package/source caches, repo scan state, and
-Reachable tool downloads.
+Reachable tool downloads. The same setup block logs repository size and then
+runs `reachctl loc .` after installation so demo operators can quote the
+same LOC telemetry that Reachable uses internally.
 
 ## Agent Strategy
 
