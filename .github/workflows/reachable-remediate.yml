@@ -185,11 +185,21 @@ jobs:
 
       - name: Install Reachable
         run: |
+          set -euo pipefail
           if command -v reachctl >/dev/null 2>&1; then
             reachctl --version
           else
-            curl -fsSL https://get.reachable.security/install.sh | bash -s -- --ci --no-vibe
+            install_script="${RUNNER_TEMP:-/tmp}/reachable-install.sh"
+            primary_url="${REACHABLE_INSTALL_URL:-https://sthenosec.com/download/install.sh}"
+            fallback_url="https://raw.githubusercontent.com/sthenos-security/reach-dist/main/install.sh"
+            if ! curl -fsSL "$primary_url" -o "$install_script"; then
+              echo "Primary Reachable installer unavailable: $primary_url"
+              echo "Trying fallback installer: $fallback_url"
+              curl -fsSL "$fallback_url" -o "$install_script"
+            fi
+            bash "$install_script" --ci --no-vibe
             echo "$HOME/.reachable/venv/bin" >> "$GITHUB_PATH"
+            echo "$HOME/.reachable/tools/bin" >> "$GITHUB_PATH"
           fi
 
       - name: Reachable LOC telemetry
