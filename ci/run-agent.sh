@@ -38,6 +38,7 @@ case "$AGENT" in
     claude \
       --print \
       --permission-mode bypassPermissions \
+      --verbose \
       --output-format stream-json \
       --max-budget-usd "${CLAUDE_MAX_BUDGET_USD:-5}" \
       "$(cat "$PROMPT_PATH")"
