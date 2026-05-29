@@ -1,0 +1,167 @@
+name: Reachable Remediation Demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: "Coding agent executor"
+        type: choice
+        default: claude
+        options:
+          - claude
+          - codex
+          - opencode
+      remediate:
+        description: "Allow CI to create code changes"
+        type: boolean
+        default: false
+      rescan_only:
+        description: "Only prove an existing reachable-remediate-* branch"
+        type: boolean
+        default: false
+      target_branch:
+        description: "Base branch, or existing remediation branch for rescan_only"
+        type: string
+        default: main
+      max_batches:
+        description: "Maximum serialized remediation batches"
+        type: number
+        default: 1
+
+permissions:
+  contents: write
+  pull-requests: write
+  security-events: write
+
+jobs:
+  reachable-remediate:
+    runs-on: ubuntu-latest
+    env:
+      REACHABLE_API_KEY: ${{ secrets.REACHABLE_API_KEY }}
+      MCP_GITHUB_TOKEN: ${{ secrets.MCP_GITHUB_TOKEN }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+      CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      OPENCODE_AUTH: ${{ secrets.OPENCODE_AUTH }}
+      REACHABLE_MAX_BATCHES: ${{ inputs.max_batches }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install Reachable
+        run: |
+          curl -fsSL https://get.reachable.security/install.sh | bash -s -- --ci --no-vibe
+          echo "$HOME/.reachable/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Baseline scan
+        run: reachctl scan . --ci --sarif reachable.sarif
+
+      - name: Upload baseline artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: reachable-baseline
+          path: |
+            reachable.sarif
+            .reachable/remediation-bundle/**
+
+      - name: Stop if remediation is disabled
+        if: ${{ !inputs.remediate && !inputs.rescan_only }}
+        run: |
+          go test ./...
+          reachctl audit --latest --summary
+          reachctl integrity --latest
+
+      - name: Create remediation branch
+        if: ${{ inputs.remediate && !inputs.rescan_only }}
+        run: |
+          BRANCH="reachable-remediate-${GITHUB_RUN_ID}"
+          git config user.name "reachable-remediation-bot"
+          git config user.email "security@sthenos.com"
+          git switch -c "$BRANCH"
+          echo "REACHABLE_REMEDIATION_BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
+      - name: Generate Reachable prompt bundle
+        if: ${{ inputs.remediate && !inputs.rescan_only }}
+        run: |
+          reachctl vibe prompt \
+            --workspace . \
+            --agent "${{ inputs.agent }}" \
+            --branch-name "$REACHABLE_REMEDIATION_BRANCH" \
+            --all
+
+      - name: Install selected coding agent
+        if: ${{ inputs.remediate && !inputs.rescan_only }}
+        run: |
+          case "${{ inputs.agent }}" in
+            claude)
+              npm install -g @anthropic-ai/claude-code
+              claude --version
+              ;;
+            codex)
+              npm install -g @openai/codex
+              codex --version
+              ;;
+            opencode)
+              npm install -g opencode-ai
+              opencode --version
+              ;;
+            *)
+              echo "unsupported agent: ${{ inputs.agent }}" >&2
+              exit 2
+              ;;
+          esac
+
+      - name: Run selected coding agent
+        if: ${{ inputs.remediate && !inputs.rescan_only }}
+        run: ./ci/run-agent.sh "${{ inputs.agent }}" .reachable/remediation-bundle/prompt.md
+
+      - name: Prove remediation
+        if: ${{ inputs.remediate || inputs.rescan_only }}
+        run: |
+          go test ./...
+          reachctl scan . --ci --sarif reachable-after.sarif
+          reachctl audit --latest --summary
+          reachctl integrity --latest
+
+      - name: Commit remediation branch
+        if: ${{ inputs.remediate && !inputs.rescan_only }}
+        run: |
+          if git diff --quiet; then
+            echo "No remediation changes produced."
+            exit 1
+          fi
+          git add -A
+          git commit -m "fix: reachable remediation batch"
+          git push origin "$REACHABLE_REMEDIATION_BRANCH"
+
+      - name: Open remediation PR
+        if: ${{ inputs.remediate && !inputs.rescan_only }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr create \
+            --base "${{ inputs.target_branch }}" \
+            --head "$REACHABLE_REMEDIATION_BRANCH" \
+            --title "Reachable remediation demo" \
+            --body "Automated Reachable remediation proof branch."
+
+      - name: Upload remediation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reachable-remediation-artifacts
+          path: |
+            reachable*.sarif
+            .reachable/remediation-bundle/**
+            .reachable/vibe-scenarios/workspace-remediation/**
