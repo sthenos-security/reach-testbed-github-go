@@ -98,6 +98,8 @@ jobs:
   reachable-remediate:
     runs-on: ubuntu-latest
     env:
+      REACHABLE_DIST_REPO: ${{ vars.REACHABLE_DIST_REPO || 'sthenos-security/reach-dist' }}
+      REACHABLE_VERSION: ${{ vars.REACHABLE_VERSION || '' }}
       REACHABLE_REMEDIATE_ENABLED: ${{ inputs.remediate }}
       REACHABLE_RESCAN_ONLY: ${{ inputs.rescan_only }}
       REACHABLE_AGENT: ${{ inputs.agent }}
@@ -156,18 +158,16 @@ jobs:
 
       - name: Prepare Reachable cache directories
         run: |
-          mkdir -p "$HOME/.reachable/cache" "$HOME/.reachable/scans" "$HOME/.reachable/tools"
+          mkdir -p "$HOME/.reachable"
 
       - name: Restore Reachable cache
         id: reachable-cache
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.reachable/cache
-            ~/.reachable/scans
-            ~/.reachable/tools
-          key: reachable-${{ runner.os }}-${{ github.repository_id }}-${{ hashFiles('**/go.sum', '**/go.mod', '**/package-lock.json', '**/pnpm-lock.yaml', '**/yarn.lock', '**/requirements*.txt', '**/poetry.lock', '**/uv.lock', '**/Pipfile.lock', '**/Cargo.lock', '**/Gemfile.lock', '**/pom.xml', '**/build.gradle*', '**/*.csproj') }}
+          path: ~/.reachable
+          key: reachable-${{ runner.os }}-${{ github.repository_id }}-${{ env.REACHABLE_VERSION }}-${{ hashFiles('**/go.sum', '**/go.mod', '**/package-lock.json', '**/pnpm-lock.yaml', '**/yarn.lock', '**/requirements*.txt', '**/poetry.lock', '**/uv.lock', '**/Pipfile.lock', '**/Cargo.lock', '**/Gemfile.lock', '**/pom.xml', '**/build.gradle*', '**/*.csproj') }}
           restore-keys: |
+            reachable-${{ runner.os }}-${{ github.repository_id }}-${{ env.REACHABLE_VERSION }}-
             reachable-${{ runner.os }}-${{ github.repository_id }}-
             reachable-${{ runner.os }}-
 
@@ -181,7 +181,7 @@ jobs:
           else
             echo "Reachable cache active: cold start; this run will populate GitHub Actions cache."
           fi
-          du -sh "$HOME/.reachable/cache" "$HOME/.reachable/scans" "$HOME/.reachable/tools" 2>/dev/null || true
+          du -sh "$HOME/.reachable" 2>/dev/null || true
 
       - name: Install Reachable
         run: |
@@ -190,23 +190,27 @@ jobs:
             reachctl --version
           else
             install_script="${RUNNER_TEMP:-/tmp}/reachable-install.sh"
-            primary_url="${REACHABLE_INSTALL_URL:-https://sthenosec.com/download/install.sh}"
-            fallback_url="https://raw.githubusercontent.com/sthenos-security/reach-dist/main/install.sh"
-            if ! curl -fsSL "$primary_url" -o "$install_script"; then
-              echo "Primary Reachable installer unavailable: $primary_url"
-              echo "Trying fallback installer: $fallback_url"
-              curl -fsSL "$fallback_url" -o "$install_script"
+            installer_url="${REACHABLE_INSTALL_URL:-https://raw.githubusercontent.com/${REACHABLE_DIST_REPO}/main/install.sh}"
+            install_args=()
+            if [ -n "$REACHABLE_VERSION" ]; then
+              install_args+=(--version "$REACHABLE_VERSION")
             fi
-            bash "$install_script" --ci --no-vibe
+            curl -fsSL "$installer_url" -o "$install_script"
+            bash "$install_script" "${install_args[@]}"
             echo "$HOME/.reachable/venv/bin" >> "$GITHUB_PATH"
             echo "$HOME/.reachable/tools/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.reachable/venv/bin:$HOME/.reachable/tools/bin:$PATH"
+            reachctl version
           fi
 
       - name: Reachable LOC telemetry
-        run: reachctl loc .
+        run: |
+          export PATH="$HOME/.reachable/venv/bin:$HOME/.reachable/tools/bin:$PATH"
+          reachctl loc .
 
       - name: Baseline scan
         run: |
+          export PATH="$HOME/.reachable/venv/bin:$HOME/.reachable/tools/bin:$PATH"
           mkdir -p .reachable/ci-artifacts
           scan_start="$(date +%s)"
           provider_args=()
@@ -224,7 +228,7 @@ jobs:
         if: always()
         run: |
           echo "Reachable cache active: post-scan cache/scans/tool state below."
-          du -sh "$HOME/.reachable/cache" "$HOME/.reachable/scans" "$HOME/.reachable/tools" 2>/dev/null || true
+          du -sh "$HOME/.reachable" 2>/dev/null || true
 
       - name: Upload baseline artifacts
         uses: actions/upload-artifact@v4
@@ -238,6 +242,7 @@ jobs:
       - name: Prove without remediation
         if: ${{ !inputs.remediate || inputs.rescan_only }}
         run: |
+          export PATH="$HOME/.reachable/venv/bin:$HOME/.reachable/tools/bin:$PATH"
           if [ -n "$REACHABLE_TEST_COMMAND" ]; then
             bash -lc "$REACHABLE_TEST_COMMAND"
           fi
@@ -283,6 +288,7 @@ jobs:
       - name: Remediate in bounded batches
         if: ${{ inputs.remediate && !inputs.rescan_only }}
         run: |
+          export PATH="$HOME/.reachable/venv/bin:$HOME/.reachable/tools/bin:$PATH"
           max_batches="${REACHABLE_MAX_BATCHES:-1}"
           if [ "$max_batches" -lt 1 ]; then
             echo "REACHABLE_MAX_BATCHES must be >= 1" >&2

@@ -171,6 +171,8 @@ Recommended GitHub secrets and variables:
 | `REACHABLE_PRIVATE_LLM_API_KEY` | Optional private/local model key. |
 | `ENZO_LOCAL_MODEL` | Optional local Enzo/private model variable. |
 | `ENZO_LOCAL_API_KEY` | Optional local Enzo/private model key. |
+| `REACHABLE_DIST_REPO` | Optional repository/org variable that points at the install distribution repo. Defaults to `sthenos-security/reach-dist`. |
+| `REACHABLE_VERSION` | Optional version pin for demos or customer rollouts. Defaults to latest. |
 
 `GITHUB_TOKEN` is provided by GitHub Actions. The workflow grants it write
 access to contents, pull requests, and security events so it can push the
@@ -181,9 +183,7 @@ remediation branch, open a PR, and upload SARIF.
 The workflow restores and saves Reachable state with `actions/cache@v4`:
 
 ```text
-~/.reachable/cache
-~/.reachable/scans
-~/.reachable/tools
+~/.reachable
 ```
 
 The Actions log prints `Reachable cache active` before the baseline scan. A
