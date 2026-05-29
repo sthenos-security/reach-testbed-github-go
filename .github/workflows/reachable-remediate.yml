@@ -246,8 +246,14 @@ jobs:
           if [ -n "$REACHABLE_TEST_COMMAND" ]; then
             bash -lc "$REACHABLE_TEST_COMMAND"
           fi
-          reachctl audit --latest --summary
-          reachctl integrity --latest
+          latest_scan_path="$(find "$HOME/.reachable/scans" -path '*/main/20*' -type d | sort | tail -n 1)"
+          if [ -z "$latest_scan_path" ]; then
+            echo "No Reachable scan session found under ~/.reachable/scans." >&2
+            exit 2
+          fi
+          echo "Reachable latest scan path: $latest_scan_path"
+          reachctl audit --scan-path "$latest_scan_path" --summary
+          reachctl integrity --scan-path "$latest_scan_path"
 
       - name: Create remediation branch
         if: ${{ inputs.remediate && !inputs.rescan_only }}
@@ -353,8 +359,14 @@ jobs:
             reachctl scan . --ci --sarif ".reachable/ci-artifacts/reachable-after-batch-${batch}.sarif" "${provider_args[@]}" "${extra_args[@]}"
             batch_scan_end="$(date +%s)"
             echo "Reachable proof scan duration for batch $batch: $((batch_scan_end - batch_scan_start))s"
-            reachctl audit --latest --summary
-            reachctl integrity --latest
+            latest_scan_path="$(find "$HOME/.reachable/scans" -path '*/main/20*' -type d | sort | tail -n 1)"
+            if [ -z "$latest_scan_path" ]; then
+              echo "No Reachable scan session found under ~/.reachable/scans." >&2
+              exit 2
+            fi
+            echo "Reachable latest scan path: $latest_scan_path"
+            reachctl audit --scan-path "$latest_scan_path" --summary
+            reachctl integrity --scan-path "$latest_scan_path"
 
             if [ -z "$(git status --porcelain -- . ':!.reachable/**' ':!reachable*.sarif')" ]; then
               echo "No workspace changes after batch $batch; stopping."
