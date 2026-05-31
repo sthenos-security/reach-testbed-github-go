@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="820" viewBox="0 0 1600 820" role="img" aria-labelledby="title desc">
   <title id="title">Reachable CI Autoremediation Flow</title>
-  <desc id="desc">High-level CI flow from code change to Reachable scan, coding agent remediation, proof scan, branch, and pull request.</desc>
+  <desc id="desc">High-level CI flow from code change to Reachable scan, coding agent remediation, proof scan, evidence pack, branch, and pull request.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#07111f"/>
@@ -48,7 +48,7 @@
 
   <text x="72" y="70" class="tiny" fill="#68d9ff">REACHABLE</text>
   <text x="72" y="116" class="label text">CI Autoremediation, Without a Human Bottleneck</text>
-  <text x="72" y="150" class="body muted">A safe branch-first loop: scan, generate a bounded prompt, let the selected agent fix, then prove the result.</text>
+  <text x="72" y="150" class="body muted">A safe branch-first loop: scan, generate bounded prompts, let the selected agent fix, then prove the result.</text>
   <text x="1330" y="72" class="tiny muted">DEVOPS VIEW</text>
 
   <rect x="70" y="212" width="235" height="150" class="card"/>
@@ -64,7 +64,7 @@
   <text x="462" y="234" class="tiny" fill="#69b7ff">REACHABLE</text>
   <text x="462" y="274" class="label text">Scan &amp; Rank</text>
   <text x="462" y="306" class="body muted">signals, reachability,</text>
-  <text x="462" y="332" class="body muted">SARIF, audit proof</text>
+  <text x="462" y="332" class="body muted">SARIF, supply chain</text>
   <rect x="462" y="348" width="160" height="36" class="badge"/>
   <text x="482" y="372" class="mono" fill="#b9c8dc">repo evidence</text>
 
@@ -84,26 +84,26 @@
   <text x="1282" y="234" class="tiny" fill="#39d2c0">BUNDLE</text>
   <text x="1282" y="274" class="label text">Prompt Batch</text>
   <text x="1282" y="306" class="body muted">bounded fixes with</text>
-  <text x="1282" y="332" class="body muted">test commands</text>
+  <text x="1282" y="332" class="body muted">rescan proof</text>
   <rect x="1282" y="348" width="176" height="36" class="badge"/>
   <text x="1302" y="372" class="mono" fill="#b9c8dc">audit artifact</text>
 
   <path class="line2" d="M986 396 V496 H308 V386"/>
-  <text x="514" y="483" class="mono" fill="#6debdc">scan-only path: audit + publish findings</text>
+  <text x="514" y="483" class="mono" fill="#6debdc">scan-only path: audit + publish findings, no agent writes</text>
 
   <path class="line" d="M1390 397 V471"/>
 
   <rect x="1110" y="485" width="420" height="185" class="agentCard"/>
   <text x="1144" y="529" class="tiny" fill="#9debdc">AGENT EXECUTOR</text>
   <text x="1144" y="569" class="label text">Claude, Codex, OpenCode</text>
-  <text x="1144" y="602" class="body muted">or a custom command that</text>
-  <text x="1144" y="628" class="body muted">receives the prompt path</text>
-  <rect x="1144" y="642" width="104" height="36" class="badge"/>
-  <text x="1164" y="666" class="mono" fill="#b9c8dc">models</text>
-  <rect x="1260" y="642" width="102" height="36" class="badge"/>
-  <text x="1281" y="666" class="mono" fill="#b9c8dc">tokens</text>
-  <rect x="1374" y="642" width="104" height="36" class="badge"/>
-  <text x="1393" y="666" class="mono" fill="#b9c8dc">limits</text>
+  <text x="1144" y="602" class="body muted">Cursor or any command agent</text>
+  <text x="1144" y="628" class="body muted">gets prompts + guardrails</text>
+  <rect x="1144" y="642" width="96" height="36" class="badge"/>
+  <text x="1163" y="666" class="mono" fill="#b9c8dc">agent</text>
+  <rect x="1252" y="642" width="104" height="36" class="badge"/>
+  <text x="1272" y="666" class="mono" fill="#b9c8dc">tokens</text>
+  <rect x="1368" y="642" width="116" height="36" class="badge"/>
+  <text x="1388" y="666" class="mono" fill="#b9c8dc">audit</text>
 
   <path class="line" d="M1096 578 H998"/>
 
@@ -117,9 +117,9 @@
 
   <rect x="360" y="485" width="278" height="185" class="card"/>
   <text x="392" y="529" class="tiny" fill="#39d2c0">PROOF</text>
-  <text x="392" y="569" class="label text">Test + Rescan</text>
-  <text x="392" y="602" class="body muted">unit tests, Reachable</text>
-  <text x="392" y="628" class="body muted">audit, integrity checks</text>
+  <text x="392" y="569" class="label text">Rescan + Proof</text>
+  <text x="392" y="602" class="body muted">Reachable rescan, SARIF</text>
+  <text x="392" y="628" class="body muted">and GRC evidence pack</text>
   <rect x="392" y="642" width="170" height="36" class="success"/>
   <text x="413" y="666" class="mono" fill="#8ef4d4">zero actionable</text>
 
@@ -133,5 +133,5 @@
 
   <rect x="70" y="726" width="1460" height="48" rx="24" fill="#0b1524" stroke="#20354f" stroke-width="2"/>
   <rect x="90" y="739" width="220" height="22" rx="11" fill="url(#accent)"/>
-  <text x="330" y="756" class="mono" fill="#b9c8dc">Operator knobs: remediate, agent, provider, model, signal families, max batches, test command, PR creation</text>
+  <text x="330" y="756" class="mono" fill="#b9c8dc">Operator knobs: remediate, agent, provider, model, signal families, max batches, rescan strategy, evidence, PR creation</text>
 </svg>

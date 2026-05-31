@@ -46,10 +46,13 @@ on:
         description: "Maximum serialized remediation batches"
         type: number
         default: 1
-      test_command:
-        description: "Repository test/build command"
-        type: string
-        default: go test ./...
+      rescan_strategy:
+        description: "When to run Reachable proof rescans during remediation"
+        type: choice
+        default: final
+        options:
+          - final
+          - each_batch
       scan_extra_flags:
         description: "Extra reachctl scan flags"
         type: string
@@ -88,8 +91,10 @@ jobs:
       REACHABLE_PROMPT_PROFILE: ${{ inputs.prompt_profile }}
       REACHABLE_SIGNAL_TYPES: ${{ inputs.signal_types }}
       REACHABLE_MAX_BATCHES: ${{ inputs.max_batches }}
-      REACHABLE_TEST_COMMAND: ${{ inputs.test_command }}
+      REACHABLE_RESCAN_STRATEGY: ${{ inputs.rescan_strategy }}
       REACHABLE_SCAN_EXTRA_FLAGS: ${{ inputs.scan_extra_flags }}
+      REACHABLE_CREATE_PR: ${{ inputs.create_pr }}
+      REACHABLE_AGENT_LOG_DIR: .reachable/private-agent-logs
       REACHABLE_CUSTOM_AGENT_INSTALL_COMMAND: ${{ inputs.custom_agent_install_command }}
       REACHABLE_AGENT_RUN_COMMAND: ${{ inputs.custom_agent_run_command }}
       OPENCODE_MODEL: ${{ inputs.opencode_model }}
@@ -277,6 +282,12 @@ jobs:
           reachctl scan . --ci --sarif .reachable/ci-artifacts/reachable.sarif "${provider_args[@]}" "${extra_args[@]}"
           scan_end="$(date +%s)"
           echo "Reachable baseline scan duration: $((scan_end - scan_start))s"
+          report_label="baseline"
+          if [ "${REACHABLE_RESCAN_ONLY:-false}" = "true" ]; then
+            report_label="rescan-only"
+          fi
+          bash ci/collect-reachable-report.sh "$report_label" .reachable/ci-artifacts
+          python ci/write-remediation-ledger.py .reachable/ci-artifacts
           du -sh .reachable/ci-artifacts 2>/dev/null || true
 
       - name: Reachable cache populated
@@ -292,15 +303,11 @@ jobs:
           if-no-files-found: ignore
           path: |
             .reachable/ci-artifacts/**
-            .reachable/remediation-bundle/**
 
       - name: Prove without remediation
         if: ${{ !inputs.remediate || inputs.rescan_only }}
         run: |
           export PATH="$HOME/.reachable/venv/bin:$HOME/.reachable/tools/bin:$PATH"
-          if [ -n "$REACHABLE_TEST_COMMAND" ]; then
-            bash -lc "$REACHABLE_TEST_COMMAND"
-          fi
           latest_scan_path="$(python -c "from pathlib import Path; root=Path.home()/'.reachable'/'scans'; candidates=[p for p in root.glob('*/*/20*') if p.is_dir()]; print(max(candidates, key=lambda p: p.stat().st_mtime) if candidates else '')")"
           if [ -z "$latest_scan_path" ]; then
             echo "No Reachable scan session found under ~/.reachable/scans." >&2
@@ -356,6 +363,11 @@ jobs:
             echo "REACHABLE_MAX_BATCHES must be >= 1" >&2
             exit 2
           fi
+          if [ "${REACHABLE_RESCAN_STRATEGY:-final}" = "final" ] && [ "$max_batches" -gt 1 ]; then
+            echo "rescan_strategy=final currently supports max_batches=1 because each batch is generated from the latest scan state." >&2
+            echo "Use rescan_strategy=each_batch for serialized multi-batch remediation, or leave max_batches at 1 for the faster demo path." >&2
+            exit 2
+          fi
 
           prompt_agent="$REACHABLE_PROMPT_AGENT"
           if [ "$prompt_agent" = "auto" ]; then
@@ -402,29 +414,30 @@ jobs:
               break
             fi
 
-            agent_log=".reachable/ci-artifacts/agent-batch-${batch}.log"
+            mkdir -p "${REACHABLE_AGENT_LOG_DIR:-.reachable/private-agent-logs}"
+            agent_log="${REACHABLE_AGENT_LOG_DIR:-.reachable/private-agent-logs}/agent-batch-${batch}.log"
             set +e
-            ./ci/run-agent.sh "$REACHABLE_AGENT" .reachable/remediation-bundle/prompt.md 2>&1 \
-              | sed -u 's/##\[/# [/g' \
-              | tee "$agent_log"
-            agent_status="${PIPESTATUS[0]}"
+            ./ci/run-agent.sh "$REACHABLE_AGENT" .reachable/remediation-bundle/prompt.md > "$agent_log" 2>&1
+            agent_status="$?"
             set -e
             if [ "$agent_status" -ne 0 ]; then
               echo "Coding agent failed for batch $batch with exit code $agent_status." >&2
+              echo "Agent transcript is retained only in the private runner directory and is not uploaded." >&2
               exit "$agent_status"
             fi
+            echo "Coding agent completed batch $batch; private agent log retained on runner only."
 
-            if [ -n "$REACHABLE_TEST_COMMAND" ]; then
-              test_start="$(date +%s)"
-              bash -lc "$REACHABLE_TEST_COMMAND"
-              test_end="$(date +%s)"
-              echo "Repository test duration: $((test_end - test_start))s"
+            if [ "${REACHABLE_RESCAN_STRATEGY:-final}" != "each_batch" ]; then
+              echo "Reachable proof rescan deferred until final batch (rescan_strategy=${REACHABLE_RESCAN_STRATEGY:-final})."
+              continue
             fi
 
             batch_scan_start="$(date +%s)"
             reachctl scan . --ci --sarif ".reachable/ci-artifacts/reachable-after-batch-${batch}.sarif" "${provider_args[@]}" "${extra_args[@]}"
             batch_scan_end="$(date +%s)"
             echo "Reachable proof scan duration for batch $batch: $((batch_scan_end - batch_scan_start))s"
+            bash ci/collect-reachable-report.sh "after-batch-${batch}" .reachable/ci-artifacts
+            python ci/write-remediation-ledger.py .reachable/ci-artifacts .reachable/remediation-bundle/bundle.json
             latest_scan_path="$(python -c "from pathlib import Path; root=Path.home()/'.reachable'/'scans'; candidates=[p for p in root.glob('*/*/20*') if p.is_dir()]; print(max(candidates, key=lambda p: p.stat().st_mtime) if candidates else '')")"
             if [ -z "$latest_scan_path" ]; then
               echo "No Reachable scan session found under ~/.reachable/scans." >&2
@@ -439,6 +452,47 @@ jobs:
               break
             fi
           done
+
+          if [ "${REACHABLE_RESCAN_STRATEGY:-final}" != "each_batch" ]; then
+            final_scan_start="$(date +%s)"
+            reachctl scan . --ci --sarif ".reachable/ci-artifacts/reachable-after-final.sarif" "${provider_args[@]}" "${extra_args[@]}"
+            final_scan_end="$(date +%s)"
+            echo "Reachable final proof scan duration: $((final_scan_end - final_scan_start))s"
+            bash ci/collect-reachable-report.sh "after-final" .reachable/ci-artifacts
+            python ci/write-remediation-ledger.py .reachable/ci-artifacts .reachable/remediation-bundle/bundle.json
+            latest_scan_path="$(python -c "from pathlib import Path; root=Path.home()/'.reachable'/'scans'; candidates=[p for p in root.glob('*/*/20*') if p.is_dir()]; print(max(candidates, key=lambda p: p.stat().st_mtime) if candidates else '')")"
+            if [ -z "$latest_scan_path" ]; then
+              echo "No Reachable scan session found under ~/.reachable/scans." >&2
+              exit 2
+            fi
+            echo "Reachable latest scan path: $latest_scan_path"
+            reachctl audit --scan-path "$latest_scan_path" --summary
+            reachctl integrity --scan-path "$latest_scan_path"
+          fi
+
+      - name: Gate Reachable remediation proof
+        if: ${{ inputs.remediate && !inputs.rescan_only }}
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          ledger_path = Path(".reachable/ci-artifacts/remediation-ledger.json")
+          if not ledger_path.exists():
+              print("Reachable remediation ledger is missing.", file=sys.stderr)
+              sys.exit(3)
+
+          ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+          outcome = ledger.get("outcome") or {}
+          proof = ledger.get("proof_scan") or {}
+          status = outcome.get("status")
+          print(f"Reachable remediation outcome: {status}")
+          print(f"Reachable proof scan: {proof.get('label')} ({proof.get('results')} SARIF result(s))")
+          print(outcome.get("message") or "")
+          if status != "success":
+              sys.exit(3)
+          PY
 
       - name: Commit remediation branch
         if: ${{ inputs.remediate && !inputs.rescan_only }}
@@ -506,7 +560,7 @@ jobs:
             --base "${{ inputs.target_branch }}" \
             --head "$REACHABLE_REMEDIATION_BRANCH" \
             --title "Reachable remediation demo" \
-            --body "Automated Reachable remediation proof branch. CI scanned, generated a database-backed prompt bundle, ran the selected coding agent, tested, rescanned, audited, and verified integrity." 2>&1)"
+            --body-file .reachable/remediation-bundle/pr-body.md 2>&1)"
           pr_status="$?"
           set -e
 
@@ -520,6 +574,88 @@ jobs:
 
           printf '%s\n' "$pr_output"
 
+      - name: Select SARIF for GitHub code scanning
+        if: always()
+        run: |
+          mkdir -p .reachable/ci-artifacts
+          target=".reachable/ci-artifacts/reachable-code-scanning.sarif"
+          if [ -f ".reachable/ci-artifacts/reachable-after-final.sarif" ]; then
+            cp ".reachable/ci-artifacts/reachable-after-final.sarif" "$target"
+            echo "Selected final proof SARIF for GitHub code scanning."
+          elif find .reachable/ci-artifacts -maxdepth 1 -name 'reachable-after-batch-*.sarif' -print -quit | grep -q .; then
+            latest="$(find .reachable/ci-artifacts -maxdepth 1 -name 'reachable-after-batch-*.sarif' -print | sort -V | tail -1)"
+            cp "$latest" "$target"
+            echo "Selected latest batch proof SARIF for GitHub code scanning: $latest"
+          elif [ -f ".reachable/ci-artifacts/reachable.sarif" ]; then
+            cp ".reachable/ci-artifacts/reachable.sarif" "$target"
+            echo "Selected baseline SARIF for GitHub code scanning."
+          else
+            echo "No Reachable SARIF file was produced."
+          fi
+          if [ -f "$target" ]; then
+            echo "GitHub code scanning SARIF: $target"
+          fi
+
+      - name: Summarize Reachable code scanning data
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from collections import Counter
+          from pathlib import Path
+
+          sarif = Path(".reachable/ci-artifacts/reachable-code-scanning.sarif")
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+
+          lines = [
+              "## Reachable GitHub Dashboard",
+              "",
+              "Reachable publishes actionable production findings to GitHub Code Scanning with SARIF category `reachable`.",
+              "",
+          ]
+
+          if not sarif.exists():
+              lines.extend([
+                  "**SARIF:** not produced.",
+                  "",
+                  "No Reachable Code Scanning upload will run for this job.",
+              ])
+          else:
+              data = json.loads(sarif.read_text(encoding="utf-8"))
+              results = (data.get("runs") or [{}])[0].get("results") or []
+              levels = Counter(str(item.get("level") or "none") for item in results)
+              repo = os.environ.get("GITHUB_REPOSITORY", "")
+              code_scanning_url = f"https://github.com/{repo}/security/code-scanning?query=category%3Areachable" if repo else ""
+
+              lines.extend([
+                  f"**SARIF:** `{sarif}`",
+                  f"**Actionable results:** `{len(results)}`",
+                  "",
+                  "| SARIF level | Count |",
+                  "| --- | ---: |",
+              ])
+              for level in ("error", "warning", "note", "none"):
+                  lines.append(f"| `{level}` | {levels.get(level, 0)} |")
+              if code_scanning_url:
+                  lines.extend([
+                      "",
+                      f"[Open Reachable Code Scanning alerts]({code_scanning_url})",
+                  ])
+              lines.extend([
+                  "",
+                  "If the upload step reports that GitHub Code Security or Advanced Security is disabled, the SARIF remains available in the workflow artifacts.",
+              ])
+
+          text = "\n".join(lines) + "\n"
+          print(text)
+          if summary_path:
+              Path(summary_path).write_text(
+                  (Path(summary_path).read_text(encoding="utf-8") if Path(summary_path).exists() else "") + text,
+                  encoding="utf-8",
+              )
+          PY
+
       - name: Upload remediation artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -528,5 +664,35 @@ jobs:
           if-no-files-found: ignore
           path: |
             .reachable/ci-artifacts/**
-            .reachable/remediation-bundle/**
-            .reachable/vibe-scenarios/workspace-remediation/**
+
+      - name: Upload Reachable SARIF to code scanning
+        id: reachable-sarif-upload
+        if: ${{ always() && hashFiles('.reachable/ci-artifacts/reachable-code-scanning.sarif') != '' }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: .reachable/ci-artifacts/reachable-code-scanning.sarif
+          category: reachable
+
+      - name: Reachable code scanning upload status
+        if: always()
+        run: |
+          if [ -f ".reachable/ci-artifacts/reachable-code-scanning.sarif" ]; then
+            echo "Reachable SARIF upload outcome: ${{ steps.reachable-sarif-upload.outcome }}"
+            {
+              echo ""
+              echo "### Reachable SARIF Upload"
+              echo ""
+              echo "- Upload outcome: \`${{ steps.reachable-sarif-upload.outcome }}\`"
+              echo "- GitHub dashboard: https://github.com/${GITHUB_REPOSITORY}/security/code-scanning?query=category%3Areachable"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Reachable SARIF upload skipped because no code-scanning SARIF was produced."
+            {
+              echo ""
+              echo "### Reachable SARIF Upload"
+              echo ""
+              echo "- Upload outcome: \`skipped\`"
+              echo "- Reason: no code-scanning SARIF file was produced."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

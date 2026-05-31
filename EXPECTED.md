@@ -33,7 +33,7 @@ Expected remediation proof:
 
 | Proof target | Expected outcome |
 |--------------|------------------|
-| `go test ./...` | Passes before and after remediation. |
+| `reachctl scan . --ci --sarif .reachable/ci-artifacts/reachable-after-final.sarif` | Final proof scan returns no actionable SARIF results after remediation. |
 | Post-remediation scan | `ACTION REQUIRED 0`. |
 | Residual findings | At most filtered `NOT_REACHABLE` synthetic secret markers. |
 | `reachctl audit --latest --summary` | Passes data-quality checks. |

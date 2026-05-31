@@ -15,7 +15,7 @@ This repository is the compact Go demo for the Reachable remediation workflow:
 1. Reachable scans the repository and records database-backed signal truth.
 2. Reachable generates a bounded remediation prompt bundle.
 3. A selected coding agent applies one or more serialized fix batches.
-4. CI runs tests, rescans, audits, and verifies integrity.
+4. CI rescans the branch, audits, and verifies integrity.
 5. CI opens one reviewable `reachable-remediate-*` branch and pull request.
 
 The process is intentionally branch-first. The safe default is scan-only:
@@ -48,17 +48,19 @@ testdata/dlp/            Synthetic DLP corpus
 docs/remediation-flow.svg High-level customer-safe process diagram
 EXPECTED.md              Customer-facing baseline manifest
 .github/workflows/       Drop-in remediation workflow template
-ci/run-agent.sh          Agent executor shim used by CI and local tests
+ci/run-agent.sh          Agent executor shim used by CI and local runs
 ```
 
-## Local Smoke Test
+## Optional Local App Smoke Test
 
 ```bash
 go test ./...
 go run ./cmd/server
 ```
 
-The service listens on `:8080` by default.
+The service listens on `:8080` by default. The remediation CI demo does not
+run application tests; its proof is the final Reachable scan, audit, integrity
+check, SARIF upload, and remediation ledger.
 
 ## Local Remediation Harness
 
@@ -66,7 +68,7 @@ Agentic remediation is not a `reachctl scan` flag. The scan remains the
 source-of-truth proof step. Batch remediation is:
 
 ```text
-reachctl scan -> reachctl remediate -> coding agent -> test -> reachctl scan -> audit/integrity
+reachctl scan -> reachctl remediate -> coding agent -> reachctl scan -> audit/integrity
 ```
 
 `reachctl vibe remediate` is the continuous local vibe-coding daemon loop. The
@@ -131,8 +133,8 @@ scripts/reach-testbed-go-agent-loop.sh \
 
 The workflow at [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml)
 is written as a reusable template. It is Go-ready by default, but the same shape
-works for other languages by changing `test_command`, `scan_extra_flags`, and
-the selected coding agent.
+works for other languages by changing `scan_extra_flags` and the selected
+coding agent.
 
 Important manual inputs:
 
@@ -146,7 +148,7 @@ Important manual inputs:
 | `prompt_profile` | Remediation profile: `safe`, `balanced`, `aggressive`, `release`, or `nightly`. |
 | `signal_types` | `all`, or a comma-separated subset such as `cve,cwe,secret`. |
 | `max_batches` | Maximum serialized remediation batches. Use this to avoid huge prompts. |
-| `test_command` | Language-specific test/build command. Defaults to `go test ./...`. |
+| `rescan_strategy` | `final` runs one Reachable proof scan after all batches; `each_batch` rescans after every batch. |
 | `scan_extra_flags` | Extra `reachctl scan` flags. |
 | `custom_agent_*` | Install/run commands for an agent wrapper not built into the template. |
 | `create_pr` | Open a PR after successful remediation. |
@@ -210,11 +212,91 @@ Reachable tool downloads. The same setup block logs repository size and then
 runs `reachctl loc .` after installation so demo operators can quote the
 same LOC telemetry that Reachable uses internally.
 
+### Published CI Reports
+
+Every scan writes an actionable-production SARIF issue report into
+`.reachable/ci-artifacts/`:
+
+| File | Purpose |
+|------|---------|
+| `reachable.sarif` | Baseline issue report for GitHub code scanning. |
+| `reachable-after-batch-<n>.sarif` | Post-remediation issue report after batch `<n>`. |
+
+The SARIF report contains production findings that are `reachable` or
+`unknown` and not defended by the attack pass. `NON_PROD`, `NOT_REACHABLE`,
+and defended/noise findings stay out of CI code-scanning results. The workflow
+uploads these SARIF files as artifacts and can post them to GitHub code
+scanning when the repository enables SARIF upload. In CI mode we do not
+publish the full Reachable dashboard; customers already have their build loop,
+and SARIF is the right issue transport for CI.
+
+The workflow selects the strongest available SARIF for GitHub Code Scanning:
+final proof scan first, latest batch proof scan next, then baseline scan. The
+Actions job summary prints the selected SARIF path, actionable result count,
+SARIF levels, upload outcome, and a direct link to
+`Security > Code scanning` filtered to `category:reachable`. If GitHub rejects
+SARIF upload because code scanning is disabled for the repository, the same
+SARIF and proof artifacts remain attached to the workflow run.
+
+Each scan also publishes compact support/proof logs under
+`.reachable/ci-artifacts/reports/<label>/`:
+
+| File | Purpose |
+|------|---------|
+| `scan.log` | Full scan log. |
+| `audit.txt` | Data-quality and issue audit output. |
+| `integrity.txt` | SARIF/database integrity proof. |
+| `compliance.md` / `compliance.json` | DB-backed compliance evidence pack when supported by the installed Reachable wheel. |
+| `scan-path.txt` | Original runner scan session path. |
+
+The baseline scan is labeled `baseline`, rescan-only proof is labeled
+`rescan-only`, post-remediation proof scans are labeled `after-final` by
+default, and `after-batch-<n>` when `rescan_strategy=each_batch`.
+
+The workflow also writes a remediation ledger:
+
+| File | Purpose |
+|------|---------|
+| `.reachable/ci-artifacts/remediation-ledger.json` | Machine-readable before/attempt/after ledger. |
+| `.reachable/ci-artifacts/remediation-ledger.md` | Human-readable summary for PRs and support. |
+
+The ledger records what SARIF found, which Reachable rules were sent to the
+agent, which agent log corresponds to the attempt, and whether the final proof
+SARIF is clean. If findings remain, the status is
+`needs_retry_or_human_review`; the next CI batch must be generated from the
+updated branch/database state.
+
+The happy path should not retry. The agent should fix the selected batch and
+the final proof scan should be clean. Use multiple batches only when the
+remediation queue is too large or logically unrelated for one prompt. The
+default `rescan_strategy=final` is faster: scan, remediate batch or batches,
+then run one Reachable proof rescan at the end. Use `rescan_strategy=each_batch`
+when debugging or when a regulated workflow needs per-batch proof artifacts.
+
+Reachable does not own the customer's build/test loop. Customers can run this
+remediation job before, after, or inside their existing CI pipeline, but this
+template only scans, remediates, rescans, and publishes proof.
+
 ## Agent Strategy
 
 Reachable owns scanning, ranking, prompt-bundle generation, audit artifacts, and
 post-fix proof. The selected coding agent only consumes `prompt.md` and edits
 the current branch.
+
+The public demo workflow treats all runner output and uploaded artifacts as
+public. It does not upload raw remediation bundles, full rule packs, skills
+databases, fuzz/pentest prompts, or agent transcripts. Reachable stores the
+durable audit in `repo.db` as sanitized metadata: prompt and bundle hashes,
+selected rule IDs, workflow inputs, before/after SARIF summaries, public
+artifact fingerprints, and outcome status. The exported ledger files are
+rendered summaries for PRs and support, not the source of truth.
+
+Generated `.reachable/remediation-bundle/` files are intentionally ignored by
+git and should be treated as ephemeral runner-local inputs. The CI shim feeds
+prompts to supported agents through stdin or file attachment instead of putting
+the full prompt in the process argument list. Agent logs are retained only in a
+private runner-local directory by default; public artifacts contain SARIF,
+audit, integrity, compliance, and sanitized remediation ledger reports.
 
 Supported CI executor modes:
 

@@ -258,7 +258,8 @@
           <tr><td><code>remediate</code></td><td><code>false</code></td><td>Main kill switch. The default workflow scans and proves without changing code.</td></tr>
           <tr><td><code>remediation_mode</code></td><td><code>codex-openai</code></td><td>One-key CI mode. Use <code>OPENAI_API_KEY</code> for Codex or <code>ANTHROPIC_API_KEY</code> for Claude.</td></tr>
           <tr><td><code>max_batches</code></td><td><code>1</code></td><td>Prevents sending an unbounded backlog to one prompt.</td></tr>
-          <tr><td><code>test_command</code></td><td><code>go test ./...</code></td><td>Language-specific proof command; change this for other stacks.</td></tr>
+          <tr><td><code>proof_rescan</code></td><td><code>reachctl scan . --ci --sarif .reachable/ci-artifacts/reachable-after-final.sarif</code></td><td>Reachable proof command; the final SARIF must contain no actionable results after remediation.</td></tr>
+          <tr><td><code>public_artifacts</code></td><td><code>SARIF + sanitized ledger</code></td><td>Raw prompt bundles, rules, skills, fuzz/pentest prompts, and agent transcripts are not uploaded.</td></tr>
         </tbody>
       </table>
     </section>

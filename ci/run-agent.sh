@@ -17,9 +17,14 @@ and edits the current branch.
 EOF
 }
 
-if [[ "${1:-}" == "--help" || $# -ne 2 ]]; then
+if [[ "${1:-}" == "--help" ]]; then
   usage
-  exit $([[ "${1:-}" == "--help" ]] && echo 0 || echo 2)
+  exit 0
+fi
+
+if [[ $# -ne 2 ]]; then
+  usage
+  exit 2
 fi
 
 AGENT="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
@@ -39,10 +44,10 @@ case "$AGENT" in
     claude \
       --print \
       --permission-mode bypassPermissions \
-      --verbose \
+      --no-session-persistence \
       --output-format stream-json \
       --max-budget-usd "${CLAUDE_MAX_BUDGET_USD:-5}" \
-      "$(cat "$PROMPT_PATH")"
+      < "$PROMPT_PATH"
     ;;
 
   codex)
@@ -55,7 +60,8 @@ case "$AGENT" in
       --ask-for-approval never \
       -C "$PWD" \
       --skip-git-repo-check \
-      "$(cat "$PROMPT_PATH")"
+      --ephemeral \
+      - < "$PROMPT_PATH"
     ;;
 
   opencode)
@@ -70,7 +76,7 @@ case "$AGENT" in
     if [[ -n "${OPENCODE_AGENT:-}" ]]; then
       opencode_args+=(--agent "$OPENCODE_AGENT")
     fi
-    opencode "${opencode_args[@]}" "$(cat "$PROMPT_PATH")"
+    opencode "${opencode_args[@]}" --file "$PROMPT_PATH" "Apply the Reachable remediation instructions in the attached prompt file."
     ;;
 
   custom)
