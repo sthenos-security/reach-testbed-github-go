@@ -297,9 +297,11 @@ def main() -> int:
         except Exception as exc:  # pragma: no cover - CI compatibility fallback
             db_error = str(exc)
             print(f"::warning::Reachable remediation DB ledger persistence failed: {exc}", file=sys.stderr)
-    else:
+    elif attempts or bundle:
         db_error = "repo.db path unavailable; remediation ledger kept as file artifact only"
         print(f"::warning::{db_error}", file=sys.stderr)
+    else:
+        db_error = "scan-only run; no remediation bundle required DB persistence"
 
     status_path = artifact_dir / "remediation-ledger-db-status.txt"
     status_path.write_text(
