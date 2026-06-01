@@ -13,6 +13,7 @@ import argparse
 import html
 import json
 import os
+import re
 import shutil
 from collections import Counter
 from datetime import datetime, timezone
@@ -21,7 +22,34 @@ from typing import Any
 
 
 SEVERITY_ORDER = {"error": 0, "warning": 1, "note": 2, "none": 3}
-REACHABILITY_ORDER = {"exploitable": 0, "reachable": 1, "unknown": 2}
+RISK_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4, "UNKNOWN": 5}
+REACHABILITY_ORDER = {"exploitable": 0, "reachable": 1, "unknown": 2, "defended": 3, "defendable": 4}
+DEFENDED_STATES = {"DEFENDED", "DEFENDABLE", "NOT_EXPLOITABLE", "SAFE", "SUPPRESSED"}
+AI_LLM_TERMS = (
+    " ai ",
+    " llm",
+    "prompt",
+    "rag",
+    "mcp",
+    "model",
+    "embedding",
+    "agent",
+    "tool call",
+    "training data",
+)
+MALWARE_TERMS = ("malware", "malicious", "guarddog", "yara", "suspicious package", "osv malicious")
+DLP_TERMS = ("dlp", " pii", "personal data", "sensitive data", "ssn", "credit card", "passport", "email address")
+OWASP_WEB_CWE_MAP = {
+    "A01 Broken Access Control": {22, 23, 35, 59, 200, 201, 219, 264, 275, 276, 284, 285, 352, 359, 377, 402, 425, 441, 497, 538, 540, 548, 552, 566, 601, 639, 651, 668, 706, 862, 863, 913, 922, 1275},
+    "A02 Cryptographic Failures": {259, 310, 319, 326, 327, 328, 329, 330, 331, 335, 336, 337, 338, 340, 347, 523, 720, 757, 759, 760, 780, 818, 916},
+    "A03 Injection": {20, 74, 75, 77, 78, 79, 80, 83, 87, 88, 89, 90, 91, 93, 94, 95, 96, 97, 98, 99, 100, 113, 116, 138, 184, 470, 471, 564, 610, 643, 644, 652, 917, 943},
+    "A04 Insecure Design": {209, 256, 501, 522, 525, 602, 656, 657, 799, 807, 840, 841, 927},
+    "A05 Security Misconfiguration": {2, 11, 13, 15, 16, 209, 311, 315, 520, 526, 537, 541, 547, 611, 614, 756, 776, 942, 1004},
+    "A07 Identification and Authentication Failures": {287, 288, 290, 294, 295, 297, 300, 302, 304, 306, 307, 346, 384, 521, 613, 620, 640, 798, 940},
+    "A08 Software and Data Integrity Failures": {345, 353, 426, 494, 502, 565, 784, 829, 830, 915},
+    "A09 Security Logging and Monitoring Failures": {117, 223, 532, 778},
+    "A10 Server-Side Request Forgery": {918},
+}
 
 
 def main() -> int:
@@ -94,6 +122,9 @@ def _summarize(*, sarif: dict[str, Any], ledger: dict[str, Any]) -> dict[str, An
     ][:12]
     if not top_priority:
         top_priority = findings[:12]
+    top_defended = [item for item in findings if _is_defended(item)][:12]
+    by_family = Counter(family for item in findings for family in item.get("families", []))
+    suspicious_package_count = sum(1 for item in findings if _is_suspicious_package(item))
 
     return {
         "repo": os.environ.get("GITHUB_REPOSITORY", ""),
@@ -104,7 +135,10 @@ def _summarize(*, sarif: dict[str, Any], ledger: dict[str, Any]) -> dict[str, An
         "by_level": dict(Counter(item["level"] for item in findings)),
         "by_type": dict(Counter(item["type"] for item in findings)),
         "by_reachability": dict(Counter(item["reachability"] for item in findings)),
+        "by_family": dict(by_family),
+        "suspicious_package_count": suspicious_package_count,
         "top_priority": top_priority,
+        "top_defended": top_defended,
         "top": findings[:25],
         "remediation": _remediation_summary(ledger),
         "sarif_error": sarif.get("_error"),
@@ -119,20 +153,96 @@ def _result_summary(result: dict[str, Any], rule: dict[str, Any]) -> dict[str, s
     message = str(((result.get("message") or {}).get("text")) or "")
     package = str(props.get("package") or "")
     fix = str(props.get("fixVersion") or props.get("workaround") or "")
-    reachability = str(props.get("reachabilityState") or "unknown").upper()
     level = str(result.get("level") or "warning").lower()
     title = str(((rule.get("shortDescription") or {}).get("text")) or rule.get("name") or rule_id)
+    reachability = _reachability_state(props, message, title)
+    risk = _risk_level(props, result, rule)
+    families = _families_for_result(rule_id=rule_id, prefix=prefix, title=title, message=message, props=props)
     return {
         "rule_id": rule_id,
         "type": prefix,
         "title": title,
         "message": message,
         "level": level,
+        "risk": risk,
         "reachability": reachability,
         "package": package,
         "fix": fix,
         "location": _location(result),
+        "families": families,
     }
+
+
+def _reachability_state(props: dict[str, Any], message: str, title: str) -> str:
+    raw = str(
+        props.get("reachabilityState")
+        or props.get("state")
+        or props.get("attackerOutcome")
+        or props.get("attackOutcome")
+        or "unknown"
+    ).strip()
+    normalized = raw.upper().replace("-", "_").replace(" ", "_")
+    haystack = f" {title} {message} ".lower()
+    if normalized in {"DEFENDED", "DEFENDABLE", "NOT_EXPLOITABLE", "SAFE", "SUPPRESSED"}:
+        return "DEFENDED" if normalized in {"NOT_EXPLOITABLE", "SAFE", "SUPPRESSED"} else normalized
+    if "not exploitable" in haystack or "blocked by" in haystack or "defended" in haystack:
+        return "DEFENDED"
+    return normalized or "UNKNOWN"
+
+
+def _risk_level(props: dict[str, Any], result: dict[str, Any], rule: dict[str, Any]) -> str:
+    raw = (
+        props.get("riskLevel")
+        or props.get("risk")
+        or props.get("severity")
+        or ((rule.get("properties") or {}).get("severity") if isinstance(rule.get("properties"), dict) else None)
+        or result.get("level")
+        or "UNKNOWN"
+    )
+    risk = str(raw).upper().replace("-", "_").replace(" ", "_")
+    if risk == "ERROR":
+        return "HIGH"
+    if risk == "WARNING":
+        return "MEDIUM"
+    if risk == "NOTE":
+        return "LOW"
+    return risk
+
+
+def _families_for_result(*, rule_id: str, prefix: str, title: str, message: str, props: dict[str, Any]) -> list[str]:
+    text = f" {rule_id} {prefix} {title} {message} {json.dumps(props, sort_keys=True, default=str)} ".lower()
+    families: list[str] = []
+    if prefix in {"MALWARE", "SUSPICIOUS"} or any(term in text for term in MALWARE_TERMS):
+        families.append("Malware / suspicious supply chain")
+    if prefix == "DLP" or any(term in text for term in DLP_TERMS):
+        families.append("DLP / PII")
+    if prefix in {"AI", "LLM", "MCP", "RAG"} or any(term in text for term in AI_LLM_TERMS):
+        families.append("OWASP AI / LLM")
+    web_labels = _owasp_web_labels(rule_id, title, message, props)
+    if web_labels:
+        families.append("OWASP Web Top 10")
+        families.extend(web_labels[:2])
+    if prefix == "CVE":
+        families.append("OWASP Web Top 10")
+        families.append("A06 Vulnerable and Outdated Components")
+    if prefix == "SECRET":
+        families.append("Secrets")
+    return sorted(dict.fromkeys(families))
+
+
+def _owasp_web_labels(rule_id: str, title: str, message: str, props: dict[str, Any]) -> list[str]:
+    text = f" {rule_id} {title} {message} {json.dumps(props, sort_keys=True, default=str)} "
+    cwes = {int(match) for match in re.findall(r"CWE[-_ ]?(\d+)", text, flags=re.IGNORECASE)}
+    return [label for label, members in OWASP_WEB_CWE_MAP.items() if cwes & members]
+
+
+def _is_defended(item: dict[str, Any]) -> bool:
+    return str(item.get("reachability") or "").upper() in DEFENDED_STATES
+
+
+def _is_suspicious_package(item: dict[str, Any]) -> bool:
+    rule_id = str(item.get("rule_id") or "").upper()
+    return item.get("type") == "SUSPICIOUS" or rule_id.startswith("SUSPICIOUS/")
 
 
 def _location(result: dict[str, Any]) -> str:
@@ -149,7 +259,7 @@ def _location(result: dict[str, Any]) -> str:
 def _priority_key(item: dict[str, str]) -> tuple[int, int, str, str]:
     return (
         REACHABILITY_ORDER.get(item["reachability"].lower(), 9),
-        SEVERITY_ORDER.get(item["level"], 9),
+        RISK_ORDER.get(item.get("risk", "UNKNOWN").upper(), 9),
         item["type"],
         item["rule_id"],
     )
@@ -177,11 +287,19 @@ def _remediation_summary(ledger: dict[str, Any]) -> dict[str, Any]:
 def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, code_scanning_url: str, run_url: str) -> str:
     by_reach = summary.get("by_reachability") or {}
     by_type = summary.get("by_type") or {}
-    by_level = summary.get("by_level") or {}
+    by_family = summary.get("by_family") or {}
     remediation = summary.get("remediation") or {}
+    defended_count = sum(int(by_reach.get(state, 0)) for state in DEFENDED_STATES)
+    suspicious_count = int(summary.get("suspicious_package_count") or 0)
     priority_rows = "\n".join(_issue_row(item) for item in summary.get("top_priority") or [])
     if not priority_rows:
-        priority_rows = '<tr><td colspan="7">No exploitable or reachable findings were reported.</td></tr>'
+        priority_rows = '<tr><td colspan="8">No exploitable or reachable findings were reported.</td></tr>'
+    defended_rows = "\n".join(_issue_row(item) for item in summary.get("top_defended") or [])
+    if not defended_rows:
+        defended_rows = '<tr><td colspan="8">No defended or defendable findings were included in this public SARIF.</td></tr>'
+    rows = "\n".join(_issue_row(item) for item in summary.get("top") or [])
+    if not rows:
+        rows = '<tr><td colspan="8">No production actionable signals were reported.</td></tr>'
     rule_rows = "\n".join(_rule_row(item) for item in remediation.get("selected_rules") or [])
     if not rule_rows:
         rule_rows = '<tr><td colspan="4">No remediation rules were selected in this run.</td></tr>'
@@ -218,7 +336,7 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
 <body>
   <main>
     <h1>Reachable Go Demo - Last Scan</h1>
-    <p>Public, sanitized summary of the latest CI scan/remediation proof. Full private prompts, agent transcripts, rules, and local databases are not published here.</p>
+    <p>Public, sanitized summary of the latest CI scan/remediation proof. This page lists production actionable signals only: exploitable, reachable, unknown, and defended/defendable findings. Full private prompts, agent transcripts, rules, and local databases are not published here.</p>
     <div class="links">
       <a href="{html.escape(code_scanning_url)}">GitHub code scanning alerts</a>
       <a href="{html.escape(run_url)}">GitHub Actions run</a>
@@ -226,19 +344,34 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
       <a href="remediation-ledger.json">Download remediation ledger</a>
     </div>
     <div class="cards">
-      {_card("Actionable SARIF findings", str(summary.get("total", 0)))}
-      {_card("Reachable", str(by_reach.get("REACHABLE", 0)))}
+      {_card("Production actionable signals", str(summary.get("total", 0)))}
       {_card("Exploitable", str(by_reach.get("EXPLOITABLE", 0)))}
+      {_card("Reachable", str(by_reach.get("REACHABLE", 0)))}
       {_card("Unknown", str(by_reach.get("UNKNOWN", 0)))}
+      {_card("Defended / defendable", str(defended_count))}
       {_card("CVE", str(by_type.get("CVE", 0)))}
       {_card("CWE", str(by_type.get("CWE", 0)))}
-      {_card("Errors", str(by_level.get("error", 0)))}
-      {_card("Warnings", str(by_level.get("warning", 0)))}
+      {_card("Secrets", str(by_type.get("SECRET", 0)))}
+      {_card("Malware", str(by_type.get("MALWARE", 0)))}
+      {_card("Suspicious packages", str(suspicious_count))}
+      {_card("DLP / PII", str(by_family.get("DLP / PII", 0)))}
+      {_card("OWASP Web Top 10", str(by_family.get("OWASP Web Top 10", 0)))}
+      {_card("OWASP AI / LLM", str(by_family.get("OWASP AI / LLM", 0)))}
     </div>
-    <h2>Top Exploitable / Reachable Issues</h2>
+    <h2>Production Actionable: Exploitable / Reachable</h2>
     <table>
-      <thead><tr><th>Signal</th><th>Reachability</th><th>Level</th><th>Package</th><th>Fix</th><th>Location</th><th>Message</th></tr></thead>
+      <thead><tr><th>Signal</th><th>Reachability</th><th>Risk</th><th>Families</th><th>Package</th><th>Fix</th><th>Location</th><th>Message</th></tr></thead>
       <tbody>{priority_rows}</tbody>
+    </table>
+    <h2>Production Actionable: Defended / Defendable</h2>
+    <table>
+      <thead><tr><th>Signal</th><th>Reachability</th><th>Risk</th><th>Families</th><th>Package</th><th>Fix</th><th>Location</th><th>Message</th></tr></thead>
+      <tbody>{defended_rows}</tbody>
+    </table>
+    <h2>All Production Actionable Signals</h2>
+    <table>
+      <thead><tr><th>Signal</th><th>Reachability</th><th>Risk</th><th>Families</th><th>Package</th><th>Fix</th><th>Location</th><th>Message</th></tr></thead>
+      <tbody>{rows}</tbody>
     </table>
     <h2>Remediation Attempt</h2>
     <p>Status: <strong>{html.escape(str(remediation.get("status") or "unknown"))}</strong>. {html.escape(str(remediation.get("message") or ""))}</p>
@@ -258,13 +391,16 @@ def _card(label: str, value: str) -> str:
 
 
 def _issue_row(item: dict[str, str]) -> str:
-    reach_class = "reachable" if item.get("reachability") in {"REACHABLE", "EXPLOITABLE"} else ""
-    level_class = "warning" if item.get("level") == "warning" else ""
+    reachability = item.get("reachability", "")
+    reach_class = "reachable" if reachability in {"REACHABLE", "EXPLOITABLE"} else "defended" if reachability in DEFENDED_STATES else ""
+    risk_class = "warning" if item.get("risk") in {"HIGH", "MEDIUM"} else ""
+    families = " ".join(f'<span class="pill">{html.escape(str(family))}</span>' for family in item.get("families", [])[:3])
     return (
         "<tr>"
         f"<td><code>{html.escape(item.get('rule_id', ''))}</code></td>"
         f"<td><span class=\"pill {reach_class}\">{html.escape(item.get('reachability', ''))}</span></td>"
-        f"<td><span class=\"{level_class}\">{html.escape(item.get('level', ''))}</span></td>"
+        f"<td><span class=\"{risk_class}\">{html.escape(item.get('risk', ''))}</span></td>"
+        f"<td>{families}</td>"
         f"<td>{html.escape(item.get('package', ''))}</td>"
         f"<td>{html.escape(item.get('fix', ''))}</td>"
         f"<td><code>{html.escape(item.get('location', ''))}</code></td>"
@@ -288,30 +424,46 @@ def _rule_row(item: dict[str, Any]) -> str:
 def _render_markdown(*, summary: dict[str, Any], page_url: str, code_scanning_url: str, run_url: str) -> str:
     by_reach = summary.get("by_reachability") or {}
     by_type = summary.get("by_type") or {}
+    by_family = summary.get("by_family") or {}
     remediation = summary.get("remediation") or {}
+    defended_count = sum(int(by_reach.get(state, 0)) for state in DEFENDED_STATES)
+    suspicious_count = int(summary.get("suspicious_package_count") or 0)
     lines = [
         "## Reachable Go Demo - Last Scan",
         "",
-        f"- Findings in selected SARIF: `{summary.get('total', 0)}`",
+        f"- Production actionable signals in selected SARIF: `{summary.get('total', 0)}`",
         f"- Exploitable: `{by_reach.get('EXPLOITABLE', 0)}`",
         f"- Reachable: `{by_reach.get('REACHABLE', 0)}`",
         f"- Unknown: `{by_reach.get('UNKNOWN', 0)}`",
+        f"- Defended / defendable: `{defended_count}`",
         f"- CVE: `{by_type.get('CVE', 0)}`",
         f"- CWE: `{by_type.get('CWE', 0)}`",
+        f"- Secret: `{by_type.get('SECRET', 0)}`",
+        f"- Malware: `{by_type.get('MALWARE', 0)}`",
+        f"- Suspicious packages: `{suspicious_count}`",
+        f"- DLP / PII: `{by_family.get('DLP / PII', 0)}`",
+        f"- OWASP Web Top 10: `{by_family.get('OWASP Web Top 10', 0)}`",
+        f"- OWASP AI / LLM: `{by_family.get('OWASP AI / LLM', 0)}`",
         f"- Remediation status: `{remediation.get('status', 'unknown')}`",
         f"- Pages summary: {page_url or 'available after Pages deployment'}",
         f"- Code scanning: {code_scanning_url}",
         f"- Actions run: {run_url}",
         "",
-        "### Top exploitable / reachable issues",
+        "### Production actionable: exploitable / reachable",
         "",
     ]
     for item in (summary.get("top_priority") or [])[:10]:
         suffix = f" fix `{item['fix']}`" if item.get("fix") else ""
         location = f" at `{item['location']}`" if item.get("location") else ""
-        lines.append(f"- `{item['rule_id']}` {item['reachability']} {item['level']}{suffix}{location}")
+        lines.append(f"- `{item['rule_id']}` {item['reachability']} risk `{item['risk']}`{suffix}{location}")
     if not (summary.get("top_priority") or []):
         lines.append("- No exploitable or reachable findings were reported.")
+    lines.extend(["", "### Production actionable: defended / defendable", ""])
+    for item in (summary.get("top_defended") or [])[:10]:
+        location = f" at `{item['location']}`" if item.get("location") else ""
+        lines.append(f"- `{item['rule_id']}` {item['reachability']} risk `{item['risk']}`{location}")
+    if not (summary.get("top_defended") or []):
+        lines.append("- No defended or defendable findings were included in this public SARIF.")
     return "\n".join(lines) + "\n"
 
 

@@ -28,11 +28,12 @@ The latest public scan/remediation summary is published to GitHub Pages:
 <https://sthenos-security.github.io/reach-testbed-go/>
 
 This is the customer-friendly view for demos. It lists the last selected SARIF
-report, top exploitable/reachable issues, reachability counts, remediation
-ledger status, and links back to the Actions run and GitHub code scanning. It is
-a sanitized mini-dashboard, not the full local Reachable dashboard: raw prompt
-bundles, agent transcripts, local databases, private logs, and generated rule
-internals are not published.
+report, production actionable exploitable/reachable/unknown signals, defended
+or defendable controls, suspicious packages, malware, DLP/PII, OWASP Web Top
+10, OWASP AI/LLM, remediation ledger status, and links back to the Actions run
+and GitHub code scanning. It is a sanitized mini-dashboard, not the full local
+Reachable dashboard: raw prompt bundles, agent transcripts, local databases,
+private logs, and generated rule internals are not published.
 
 If the repository is private on a GitHub plan that does not include Pages, the
 workflow still uploads the same mini-dashboard files under
@@ -241,12 +242,13 @@ Every scan writes an actionable-production SARIF issue report into
 | `reachable.sarif` | Baseline issue report for GitHub code scanning. |
 | `reachable-after-batch-<n>.sarif` | Post-remediation issue report after batch `<n>`. |
 
-The SARIF report contains production findings that are `reachable` or
-`unknown` and not defended by the attack pass. `NON_PROD`, `NOT_REACHABLE`,
-and defended/noise findings stay out of CI code-scanning results. The workflow
-uploads these SARIF files as artifacts and can post them to GitHub code
-scanning when the repository enables SARIF upload. The workflow also publishes a
-small GitHub Pages mini-dashboard for the latest run at
+The SARIF report contains production actionable posture signals:
+`EXPLOITABLE`, `REACHABLE`, `UNKNOWN`, and `DEFENDED`/`DEFENDABLE`.
+`NON_PROD` and `NOT_REACHABLE` findings stay out of CI code-scanning results.
+Defended findings are included for audit context but do not fail the CI gate.
+The workflow uploads these SARIF files as artifacts and can post them to GitHub
+code scanning when the repository enables SARIF upload. The workflow also
+publishes a small GitHub Pages mini-dashboard for the latest run at
 <https://sthenos-security.github.io/reach-testbed-go/>. In CI mode we do not
 publish the full local Reachable dashboard by default; customers already have
 their build loop, and SARIF plus the sanitized Pages summary are the right
@@ -254,13 +256,14 @@ public issue transport for CI.
 
 The workflow selects the strongest available SARIF for GitHub Code Scanning:
 final proof scan first, latest batch proof scan next, then baseline scan. The
-Actions job summary prints the selected SARIF path, actionable result count,
-SARIF levels, upload outcome, and a direct link to
+Actions job summary prints the selected SARIF path, production actionable
+result count, Reachable risk levels, upload outcome, and a direct link to
 `Security > Code scanning` filtered to `category:reachable`. The Pages summary
-prioritizes the top exploitable/reachable issues first, then falls back to
-unknown actionable findings when no reachable issue remains. If GitHub rejects
-SARIF upload because code scanning is disabled for the repository, the same
-SARIF, Pages files, and proof artifacts remain attached to the workflow run.
+prioritizes the top production actionable exploitable/reachable issues first,
+shows defended/defendable signals separately, then falls back to unknown
+actionable findings when no reachable issue remains. If GitHub rejects SARIF
+upload because code scanning is disabled for the repository, the same SARIF,
+Pages files, and proof artifacts remain attached to the workflow run.
 
 Each scan also publishes compact support/proof logs under
 `.reachable/ci-artifacts/reports/<label>/`:

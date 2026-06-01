@@ -621,7 +621,7 @@ jobs:
           lines = [
               "## Reachable GitHub Dashboard",
               "",
-              "Reachable publishes actionable production findings to GitHub Code Scanning with SARIF category `reachable`.",
+              "Reachable publishes production actionable findings to GitHub Code Scanning with SARIF category `reachable`.",
               "",
           ]
 
@@ -634,19 +634,23 @@ jobs:
           else:
               data = json.loads(sarif.read_text(encoding="utf-8"))
               results = (data.get("runs") or [{}])[0].get("results") or []
-              levels = Counter(str(item.get("level") or "none") for item in results)
+              risks = Counter(str((item.get("properties") or {}).get("riskLevel") or "UNKNOWN").upper() for item in results)
+              reachability = Counter(str((item.get("properties") or {}).get("reachabilityState") or "UNKNOWN").upper() for item in results)
+              suspicious = sum(1 for item in results if str(item.get("ruleId") or "").upper().startswith("SUSPICIOUS/"))
               repo = os.environ.get("GITHUB_REPOSITORY", "")
               code_scanning_url = f"https://github.com/{repo}/security/code-scanning?query=category%3Areachable" if repo else ""
 
               lines.extend([
                   f"**SARIF:** `{sarif}`",
-                  f"**Actionable results:** `{len(results)}`",
+                  f"**Production actionable results:** `{len(results)}`",
+                  f"**Defended / defendable:** `{reachability.get('DEFENDED', 0) + reachability.get('DEFENDABLE', 0)}`",
+                  f"**Suspicious packages:** `{suspicious}`",
                   "",
-                  "| SARIF level | Count |",
+                  "| Reachable risk | Count |",
                   "| --- | ---: |",
               ])
-              for level in ("error", "warning", "note", "none"):
-                  lines.append(f"| `{level}` | {levels.get(level, 0)} |")
+              for risk in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO", "UNKNOWN"):
+                  lines.append(f"| `{risk}` | {risks.get(risk, 0)} |")
               if code_scanning_url:
                   lines.extend([
                       "",
