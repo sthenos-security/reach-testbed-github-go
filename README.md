@@ -30,10 +30,11 @@ The latest public scan/remediation summary is published to GitHub Pages:
 This is the customer-friendly view for demos. It lists the last selected SARIF
 report, production actionable exploitable/reachable/unknown signals, defended
 or defendable controls, suspicious packages, malware, DLP/PII, OWASP Web Top
-10, OWASP AI/LLM, remediation ledger status, and links back to the Actions run
-and GitHub code scanning. It is a sanitized mini-dashboard, not the full local
-Reachable dashboard: raw prompt bundles, agent transcripts, local databases,
-private logs, and generated rule internals are not published.
+10, OWASP AI/LLM, proof-run counts, remediation ledger status, and links back
+to the Actions run and GitHub code scanning. It is a sanitized mini-dashboard,
+not the full local Reachable dashboard: raw prompt bundles, proof witnesses,
+exploit payloads, agent transcripts, local databases, private logs, and
+generated rule internals are not published.
 
 If the repository is private on a GitHub plan that does not include Pages, the
 workflow still uploads the same mini-dashboard files under
@@ -243,10 +244,12 @@ shows defended/defendable signals separately, then falls back to unknown
 actionable findings when no reachable issue remains. It also links the latest
 DB-backed compliance evidence pack when the installed Reachable wheel supports
 `reachctl compliance report`, plus an evidence-cited auditor narrative draft
-when the wheel supports `reachctl compliance narrative --dry-run`. If GitHub
-rejects SARIF upload because code scanning is disabled for the repository, the
-same SARIF, Pages files, and proof artifacts remain attached to the workflow
-run.
+when the wheel supports `reachctl compliance narrative --dry-run`. When the
+selected SARIF or copied compliance JSON includes DB-backed proof state, the
+mini-dashboard shows proof profile/run totals, verified proof runs, defended
+re-attacks, and proof-needs-review counts. If GitHub rejects SARIF upload
+because code scanning is disabled for the repository, the same SARIF, Pages
+files, and proof artifacts remain attached to the workflow run.
 
 Each scan also publishes compact support/proof logs under
 `.reachable/ci-artifacts/reports/<label>/`:

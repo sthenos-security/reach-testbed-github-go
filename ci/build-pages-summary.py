@@ -72,7 +72,7 @@ def main() -> int:
         shutil.copy2(ledger_path, out_dir / "remediation-ledger.json")
     compliance = _copy_latest_compliance_pack(out_dir)
 
-    summary = _summarize(sarif=sarif, ledger=ledger)
+    summary = _summarize(sarif=sarif, ledger=ledger, compliance=compliance)
     summary["compliance"] = compliance
     page_url = _pages_url()
     code_scanning_url = _code_scanning_url()
@@ -129,6 +129,10 @@ def _copy_latest_compliance_pack(out_dir: Path) -> dict[str, Any]:
         if json_path.exists():
             shutil.copy2(json_path, out_dir / "compliance.json")
             copied["json"] = "compliance.json"
+            compliance_json = _load_json(json_path)
+            proof_counts = (compliance_json.get("summary") or {}).get("proof_run_counts")
+            if isinstance(proof_counts, dict):
+                copied["proof_run_counts"] = proof_counts
         if narrative_md_path.exists():
             shutil.copy2(narrative_md_path, out_dir / "compliance-narrative.md")
             copied["narrative_markdown"] = "compliance-narrative.md"
@@ -139,7 +143,7 @@ def _copy_latest_compliance_pack(out_dir: Path) -> dict[str, Any]:
     return {"available": False}
 
 
-def _summarize(*, sarif: dict[str, Any], ledger: dict[str, Any]) -> dict[str, Any]:
+def _summarize(*, sarif: dict[str, Any], ledger: dict[str, Any], compliance: dict[str, Any] | None = None) -> dict[str, Any]:
     run = (sarif.get("runs") or [{}])[0] if isinstance(sarif, dict) else {}
     rules = {
         str(rule.get("id") or ""): rule
@@ -175,12 +179,13 @@ def _summarize(*, sarif: dict[str, Any], ledger: dict[str, Any]) -> dict[str, An
         "top_defended": top_defended,
         "top": findings[:25],
         "remediation": _remediation_summary(ledger),
+        "proof": _proof_summary(run=run, findings=findings, compliance=compliance or {}),
         "sarif_error": sarif.get("_error"),
         "ledger_error": ledger.get("_error"),
     }
 
 
-def _result_summary(result: dict[str, Any], rule: dict[str, Any]) -> dict[str, str]:
+def _result_summary(result: dict[str, Any], rule: dict[str, Any]) -> dict[str, Any]:
     props = result.get("properties") or {}
     rule_id = str(result.get("ruleId") or rule.get("id") or "REACHABLE")
     prefix = rule_id.split("/", 1)[0] if "/" in rule_id else "OTHER"
@@ -204,6 +209,7 @@ def _result_summary(result: dict[str, Any], rule: dict[str, Any]) -> dict[str, s
         "fix": fix,
         "location": _location(result),
         "families": families,
+        "proof": _sanitize_proof_evidence(props.get("proofEvidence")),
     }
 
 
@@ -318,12 +324,106 @@ def _remediation_summary(ledger: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _proof_summary(*, run: dict[str, Any], findings: list[dict[str, Any]], compliance: dict[str, Any]) -> dict[str, Any]:
+    proof = _sanitize_proof_evidence((run.get("properties") or {}).get("proofEvidence"))
+    source = "sarif" if proof.get("run_count") else ""
+    if not proof.get("run_count"):
+        proof = _proof_from_compliance_counts(compliance.get("proof_run_counts"))
+        source = "compliance" if proof.get("run_count") else ""
+    if not proof.get("run_count"):
+        proof = _proof_from_findings(findings)
+        source = "sarif-results" if proof.get("run_count") else "none"
+    proof["source"] = source
+    return proof
+
+
+def _sanitize_proof_evidence(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return _empty_proof_summary()
+    return {
+        "profile_count": _safe_int(value.get("profileCount")),
+        "run_count": _safe_int(value.get("runCount")),
+        "verified_exploitable": _safe_int(value.get("verifiedExploitable")),
+        "defended_after_reattack": _safe_int(value.get("defendedAfterReattack")),
+        "needs_review": _safe_int(value.get("needsReview")),
+        "failed": _safe_int(value.get("failed")),
+        "skipped_policy": _safe_int(value.get("skippedPolicy")),
+        "by_state": _safe_int_map(value.get("byState")),
+        "profile_kinds": [str(item) for item in (value.get("profileKinds") or []) if item],
+    }
+
+
+def _proof_from_compliance_counts(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return _empty_proof_summary()
+    return {
+        "profile_count": _safe_int(value.get("total_profiles")),
+        "run_count": _safe_int(value.get("total_runs")),
+        "verified_exploitable": _safe_int(value.get("verified_exploitable")),
+        "defended_after_reattack": _safe_int(value.get("defended_after_reattack")),
+        "needs_review": _safe_int(value.get("needs_review")),
+        "failed": _safe_int(value.get("failed")),
+        "skipped_policy": _safe_int(value.get("skipped_policy")),
+        "by_state": _safe_int_map(value.get("by_state")),
+        "profile_kinds": sorted(str(item) for item in (value.get("by_profile_kind") or {}).keys() if item),
+    }
+
+
+def _proof_from_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
+    summary = _empty_proof_summary()
+    kinds: set[str] = set()
+    for item in findings:
+        proof = item.get("proof")
+        if not isinstance(proof, dict) or not proof.get("run_count"):
+            continue
+        summary["profile_count"] += _safe_int(proof.get("profile_count"))
+        summary["run_count"] += _safe_int(proof.get("run_count"))
+        summary["verified_exploitable"] += _safe_int(proof.get("verified_exploitable"))
+        summary["defended_after_reattack"] += _safe_int(proof.get("defended_after_reattack"))
+        summary["needs_review"] += _safe_int(proof.get("needs_review"))
+        summary["failed"] += _safe_int(proof.get("failed"))
+        summary["skipped_policy"] += _safe_int(proof.get("skipped_policy"))
+        for state, count in (proof.get("by_state") or {}).items():
+            summary["by_state"][state] = summary["by_state"].get(state, 0) + _safe_int(count)
+        kinds.update(str(kind) for kind in (proof.get("profile_kinds") or []) if kind)
+    summary["profile_kinds"] = sorted(kinds)
+    return summary
+
+
+def _empty_proof_summary() -> dict[str, Any]:
+    return {
+        "profile_count": 0,
+        "run_count": 0,
+        "verified_exploitable": 0,
+        "defended_after_reattack": 0,
+        "needs_review": 0,
+        "failed": 0,
+        "skipped_policy": 0,
+        "by_state": {},
+        "profile_kinds": [],
+    }
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _safe_int_map(value: Any) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): _safe_int(count) for key, count in value.items() if key}
+
+
 def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, code_scanning_url: str, run_url: str) -> str:
     by_reach = summary.get("by_reachability") or {}
     by_type = summary.get("by_type") or {}
     by_family = summary.get("by_family") or {}
     remediation = summary.get("remediation") or {}
     compliance = summary.get("compliance") or {}
+    proof = summary.get("proof") or {}
     defended_count = sum(int(by_reach.get(state, 0)) for state in DEFENDED_STATES)
     suspicious_count = int(summary.get("suspicious_package_count") or 0)
     priority_rows = "\n".join(_issue_row(item) for item in summary.get("top_priority") or [])
@@ -393,7 +493,12 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
       {_card("DLP / PII", str(by_family.get("DLP / PII", 0)))}
       {_card("OWASP Web Top 10", str(by_family.get("OWASP Web Top 10", 0)))}
       {_card("OWASP AI / LLM", str(by_family.get("OWASP AI / LLM", 0)))}
+      {_card("Proof runs", str(proof.get("run_count", 0)))}
+      {_card("Verified proof runs", str(proof.get("verified_exploitable", 0)))}
+      {_card("Defended re-attacks", str(proof.get("defended_after_reattack", 0)))}
+      {_card("Proof needs review", str(proof.get("needs_review", 0)))}
     </div>
+    <p class="muted">Proof evidence source: {html.escape(str(proof.get("source") or "none"))}. This page shows proof counts only; raw witnesses, payloads, prompts, transcripts, and local databases are not published.</p>
     <h2>Production Actionable: Exploitable / Reachable</h2>
     <table>
       <thead><tr><th>Signal</th><th>Reachability</th><th>Risk</th><th>Families</th><th>Package</th><th>Fix</th><th>Location</th><th>Message</th></tr></thead>
@@ -478,6 +583,7 @@ def _render_markdown(*, summary: dict[str, Any], page_url: str, code_scanning_ur
     by_family = summary.get("by_family") or {}
     remediation = summary.get("remediation") or {}
     compliance = summary.get("compliance") or {}
+    proof = summary.get("proof") or {}
     defended_count = sum(int(by_reach.get(state, 0)) for state in DEFENDED_STATES)
     suspicious_count = int(summary.get("suspicious_package_count") or 0)
     lines = [
@@ -496,6 +602,10 @@ def _render_markdown(*, summary: dict[str, Any], page_url: str, code_scanning_ur
         f"- DLP / PII: `{by_family.get('DLP / PII', 0)}`",
         f"- OWASP Web Top 10: `{by_family.get('OWASP Web Top 10', 0)}`",
         f"- OWASP AI / LLM: `{by_family.get('OWASP AI / LLM', 0)}`",
+        f"- Proof runs: `{proof.get('run_count', 0)}` from `{proof.get('source', 'none')}`",
+        f"- Verified proof runs: `{proof.get('verified_exploitable', 0)}`",
+        f"- Defended re-attacks: `{proof.get('defended_after_reattack', 0)}`",
+        f"- Proof needs review: `{proof.get('needs_review', 0)}`",
         f"- Remediation status: `{remediation.get('status', 'unknown')}`",
         f"- Compliance evidence pack: `{('available from Pages' if compliance.get('available') else 'not available')}`",
         f"- Compliance narrative draft: `{('available from Pages' if compliance.get('narrative_markdown') else 'not available')}`",
