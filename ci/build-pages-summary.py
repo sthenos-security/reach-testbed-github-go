@@ -118,7 +118,9 @@ def _copy_latest_compliance_pack(out_dir: Path) -> dict[str, Any]:
         report_dir = reports_root / label
         md_path = report_dir / "compliance.md"
         json_path = report_dir / "compliance.json"
-        if not md_path.exists() and not json_path.exists():
+        narrative_md_path = report_dir / "compliance-narrative.md"
+        narrative_json_path = report_dir / "compliance-narrative.json"
+        if not any(path.exists() for path in (md_path, json_path, narrative_md_path, narrative_json_path)):
             continue
         copied: dict[str, Any] = {"available": True, "label": label}
         if md_path.exists():
@@ -127,6 +129,12 @@ def _copy_latest_compliance_pack(out_dir: Path) -> dict[str, Any]:
         if json_path.exists():
             shutil.copy2(json_path, out_dir / "compliance.json")
             copied["json"] = "compliance.json"
+        if narrative_md_path.exists():
+            shutil.copy2(narrative_md_path, out_dir / "compliance-narrative.md")
+            copied["narrative_markdown"] = "compliance-narrative.md"
+        if narrative_json_path.exists():
+            shutil.copy2(narrative_json_path, out_dir / "compliance-narrative.json")
+            copied["narrative_json"] = "compliance-narrative.json"
         return copied
     return {"available": False}
 
@@ -426,6 +434,10 @@ def _compliance_links(compliance: dict[str, Any]) -> str:
         links.append('<a href="compliance.md">Download compliance pack</a>')
     if compliance.get("json"):
         links.append('<a href="compliance.json">Download compliance JSON</a>')
+    if compliance.get("narrative_markdown"):
+        links.append('<a href="compliance-narrative.md">Download auditor narrative</a>')
+    if compliance.get("narrative_json"):
+        links.append('<a href="compliance-narrative.json">Download narrative JSON</a>')
     return "\n      ".join(links)
 
 
@@ -486,6 +498,7 @@ def _render_markdown(*, summary: dict[str, Any], page_url: str, code_scanning_ur
         f"- OWASP AI / LLM: `{by_family.get('OWASP AI / LLM', 0)}`",
         f"- Remediation status: `{remediation.get('status', 'unknown')}`",
         f"- Compliance evidence pack: `{('available from Pages' if compliance.get('available') else 'not available')}`",
+        f"- Compliance narrative draft: `{('available from Pages' if compliance.get('narrative_markdown') else 'not available')}`",
         f"- Pages summary: {page_url or 'available after Pages deployment'}",
         f"- Code scanning: {code_scanning_url}",
         f"- Actions run: {run_url}",

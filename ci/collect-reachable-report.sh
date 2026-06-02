@@ -45,10 +45,21 @@ if reachctl compliance --help >/dev/null 2>&1; then
   compliance_md_status="$?"
   reachctl compliance report --scan-path "$scan_path" --format json --output "$report_dir/compliance.json" >> "$report_dir/compliance.stdout" 2>> "$report_dir/compliance.stderr"
   compliance_json_status="$?"
+  if reachctl compliance narrative --help >/dev/null 2>&1; then
+    reachctl compliance narrative --scan-path "$scan_path" --dry-run --format markdown --output "$report_dir/compliance-narrative.md" >> "$report_dir/compliance.stdout" 2>> "$report_dir/compliance.stderr"
+    compliance_narrative_md_status="$?"
+    reachctl compliance narrative --scan-path "$scan_path" --dry-run --format json --output "$report_dir/compliance-narrative.json" >> "$report_dir/compliance.stdout" 2>> "$report_dir/compliance.stderr"
+    compliance_narrative_json_status="$?"
+  else
+    compliance_narrative_md_status="127"
+    compliance_narrative_json_status="127"
+  fi
 else
   printf '%s\n' "reachctl compliance command is not available in this wheel." > "$report_dir/compliance.stderr"
   compliance_md_status="127"
   compliance_json_status="127"
+  compliance_narrative_md_status="127"
+  compliance_narrative_json_status="127"
 fi
 set -e
 
@@ -56,6 +67,8 @@ printf '%s\n' "$audit_status" > "$report_dir/audit.exitcode"
 printf '%s\n' "$integrity_status" > "$report_dir/integrity.exitcode"
 printf '%s\n' "$compliance_md_status" > "$report_dir/compliance-md.exitcode"
 printf '%s\n' "$compliance_json_status" > "$report_dir/compliance-json.exitcode"
+printf '%s\n' "$compliance_narrative_md_status" > "$report_dir/compliance-narrative-md.exitcode"
+printf '%s\n' "$compliance_narrative_json_status" > "$report_dir/compliance-narrative-json.exitcode"
 
 cat > "$report_dir/README.md" <<EOF
 # Reachable Scan Report: $safe_label
@@ -71,6 +84,7 @@ Issue-bearing artifacts:
 - \`audit.txt\` - data-quality and issue audit
 - \`integrity.txt\` - SARIF/database integrity proof
 - \`compliance.md\` / \`compliance.json\` - DB-backed compliance evidence pack when supported by the installed wheel
+- \`compliance-narrative.md\` / \`compliance-narrative.json\` - evidence-cited auditor narrative draft when supported by the installed wheel
 EOF
 
 echo "Reachable scan report artifact prepared: $report_dir"
