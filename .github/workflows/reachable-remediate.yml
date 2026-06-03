@@ -158,6 +158,7 @@ jobs:
               agent="codex"
               prompt_agent="codex"
               provider="openai"
+              provider_label="openai"
               if [ "$require_auth" -eq 1 ] && [ -z "${OPENAI_API_KEY:-}" ]; then
                 echo "remediation_mode=codex-openai requires one GitHub secret: OPENAI_API_KEY." >&2
                 exit 2
@@ -166,7 +167,9 @@ jobs:
             claude-anthropic)
               agent="claude"
               prompt_agent="claude"
+              # reachctl currently names the Anthropic provider flag "claude".
               provider="claude"
+              provider_label="anthropic"
               if [ "$require_auth" -eq 1 ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
                 echo "remediation_mode=claude-anthropic requires one GitHub secret: ANTHROPIC_API_KEY." >&2
                 exit 2
@@ -182,12 +185,13 @@ jobs:
             echo "REACHABLE_AGENT=$agent"
             echo "REACHABLE_PROMPT_AGENT=$prompt_agent"
             echo "REACHABLE_LLM_PROVIDER=$provider"
+            echo "REACHABLE_LLM_PROVIDER_LABEL=$provider_label"
           } >> "$GITHUB_ENV"
 
           echo "Reachable remediation mode: $mode"
           echo "  coding agent: $agent"
           echo "  prompt flavor: $prompt_agent"
-          echo "  Reachable AI provider: $provider"
+          echo "  Reachable AI provider: $provider_label"
 
       - name: Validate CI credentials
         run: |
@@ -199,7 +203,7 @@ jobs:
 
           echo "Reachable CI credential preflight:"
           echo "  remediation mode: ${REACHABLE_REMEDIATION_MODE}"
-          echo "  selected scan provider: ${REACHABLE_LLM_PROVIDER}"
+          echo "  selected scan provider: ${REACHABLE_LLM_PROVIDER_LABEL:-$REACHABLE_LLM_PROVIDER}"
           echo "  built-in GITHUB_TOKEN: present"
           echo "  REACHABLE_GITHUB_TOKEN configured: $([ -n "${REACHABLE_GITHUB_TOKEN:-}" ] && echo yes || echo no)"
           echo "  MCP_GITHUB_TOKEN configured: $([ -n "${MCP_GITHUB_TOKEN:-}" ] && echo yes || echo no)"

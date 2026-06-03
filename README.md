@@ -174,7 +174,7 @@ For the investor/customer CI demo, use one mode and one matching provider key:
 | Mode | Required GitHub secret | What it drives |
 |------|------------------------|----------------|
 | `codex-openai` | `OPENAI_API_KEY` | Reachable OpenAI scan/enrichment plus Codex remediation. |
-| `claude-anthropic` | `ANTHROPIC_API_KEY` | Reachable Claude scan/enrichment plus Claude Code remediation. |
+| `claude-anthropic` | `ANTHROPIC_API_KEY` | Reachable Anthropic scan/enrichment plus Claude Code remediation. |
 
 Additional supported GitHub secrets and variables:
 
