@@ -232,6 +232,7 @@
         <a class="link-chip" href="EXPECTED.md">Human-readable contract</a>
         <a class="link-chip" href="https://github.com/sthenos-security/reach-testbed-go/blob/main/expected/baseline.json">Machine-readable contract</a>
         <a class="link-chip" href="index.html">Last published proof page</a>
+        <a class="link-chip" href="index.html#artifacts">Published artifacts</a>
         <a class="link-chip" href="db-remediation-verdict.json">DB verdict artifact</a>
       </div>
     </section>
@@ -342,60 +343,14 @@
     </section>
 
     <section>
-      <h2>CI Evidence Flow</h2>
+      <h2>Workflow Details</h2>
       <p>
-        The workflow is branch-first. It creates evidence before remediation,
-        runs the agent only when enabled, then creates separate proof evidence
-        from the remediation branch.
-      </p>
-      <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Step</th>
-            <th>Workflow/script</th>
-            <th>Why it exists</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>Install and cache</td><td><code>reachable-remediate.yml</code>, <code>ci/reachable-cache-evidence.py</code></td><td>Installs or upgrades Reachable, records whether the run reused cache or started fresh, and captures version/database evidence.</td></tr>
-          <tr><td>Baseline scan</td><td><code>reachctl scan --ci</code>, <code>ci/collect-reachable-report.sh</code></td><td>Scans the vulnerable branch and writes the baseline <code>repo.db</code> evidence used by the demo contract.</td></tr>
-          <tr><td>Baseline contract check</td><td><code>expected/baseline.json</code>, <code>ci/check-db-remediation-proof.py</code></td><td>Verifies that the known vulnerable branch still matches the expected findings before any remediation is trusted.</td></tr>
-          <tr><td>Remediation task</td><td><code>reachctl remediate</code>, <code>ci/run-agent.sh</code></td><td>Synthesizes a bounded task from DB evidence and asks the selected agent to patch a dedicated remediation branch.</td></tr>
-          <tr><td>Project safety gate</td><td><code>go test ./...</code> by default</td><td>Confirms the agent did not break the application before Reachable performs the proof scan.</td></tr>
-          <tr><td>Proof scan</td><td><code>reachctl scan --ci</code> on the remediation branch</td><td>Creates a second DB-backed scan from the patched branch so fixes are measured from evidence, not from the agent's claims.</td></tr>
-          <tr><td>DB verdict</td><td><code>ci/check-db-remediation-proof.py</code>, <code>db-remediation-verdict.json</code></td><td>Compares baseline and proof databases. The run passes only when expected findings are fixed and remaining actionable rows are zero.</td></tr>
-          <tr><td>Publish evidence</td><td><code>ci/build-pages-summary.py</code>, GitHub Pages</td><td>Publishes a sanitized report with branch, commit, scan IDs, runtime, cache state, AI cost, and artifact links. Private prompts and raw databases are not published.</td></tr>
-        </tbody>
-      </table>
-      </div>
-    </section>
-
-    <section>
-      <h2>CI Controls</h2>
-      <p>
-        These controls are implemented by the
+        This page is the contract and evidence view. The CI mechanics, inputs,
+        guardrails, and repository layout live in the
+        <a href="https://github.com/sthenos-security/reach-testbed-go#ci-validation-flow">repository README</a>
+        and the
         <a href="https://github.com/sthenos-security/reach-testbed-go/blob/main/.github/workflows/reachable-remediate.yml">Reachable Remediation Template workflow</a>.
-        They define whether CI only scans, creates a remediation branch, opens
-        a pull request, or verifies an existing branch.
       </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Control</th>
-            <th>Default</th>
-            <th>Why it matters</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td><code>remediate</code></td><td><code>false</code></td><td>Main kill switch. The default workflow scans and proves without changing code.</td></tr>
-          <tr><td><code>remediation_mode</code></td><td><code>codex-openai</code></td><td>One-key CI mode. Use <code>OPENAI_API_KEY</code> for Codex or <code>ANTHROPIC_API_KEY</code> for Claude.</td></tr>
-          <tr><td><code>max_batches</code></td><td><code>1</code></td><td>Prevents sending an unbounded backlog to one prompt.</td></tr>
-          <tr><td><code>proof_rescan</code></td><td>Enabled</td><td>Reachable performs a separate proof scan of the remediation branch. The final database must contain no production-actionable results.</td></tr>
-          <tr><td><code>rescan_only</code></td><td><code>false</code></td><td>When true, verifies an existing remediation branch without invoking a coding agent or changing code.</td></tr>
-          <tr><td><code>public_artifacts</code></td><td><code>DB verdict + sanitized ledger</code></td><td>Raw prompt bundles, rules, skills, fuzz/pentest prompts, agent transcripts, and local databases are not uploaded.</td></tr>
-        </tbody>
-      </table>
     </section>
   </main>
   <script>

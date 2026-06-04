@@ -84,13 +84,13 @@ not private execution material.
 
 | Artifact | Purpose |
 |----------|---------|
-| `summary.json` / `summary.md` | Compact DB-backed run summary for the public page. |
-| `db-remediation-verdict.json` | Machine-readable baseline/proof comparison and final verdict. |
-| `reachable.sarif` | Compatibility export for GitHub Code Scanning; not the demo verdict source. |
-| `remediation-ledger.json` | Sanitized remediation summary with rule IDs and outcomes, not prompt text. |
-| `compliance.md` / `compliance.json` | DB-backed compliance evidence extract. |
-| `compliance-narrative.md` / `compliance-narrative.json` | Evidence-cited narrative draft for review, not a legal attestation. |
-| `EXPECTED.md` | Human-readable expected issue contract. |
+| [summary.json](https://sthenos-security.github.io/reach-testbed-go/summary.json) / [summary.md](https://sthenos-security.github.io/reach-testbed-go/summary.md) | Compact DB-backed run summary for the public page. |
+| [db-remediation-verdict.json](https://sthenos-security.github.io/reach-testbed-go/db-remediation-verdict.json) | Machine-readable baseline/proof comparison and final verdict. |
+| [reachable.sarif](https://sthenos-security.github.io/reach-testbed-go/reachable.sarif) | Compatibility export for GitHub Code Scanning; not the demo verdict source. |
+| [remediation-ledger.json](https://sthenos-security.github.io/reach-testbed-go/remediation-ledger.json) | Sanitized remediation summary with rule IDs and outcomes, not prompt text. |
+| [compliance.md](https://sthenos-security.github.io/reach-testbed-go/compliance.md) / [compliance.json](https://sthenos-security.github.io/reach-testbed-go/compliance.json) | DB-backed compliance evidence extract. |
+| [compliance-narrative.md](https://sthenos-security.github.io/reach-testbed-go/compliance-narrative.md) / [compliance-narrative.json](https://sthenos-security.github.io/reach-testbed-go/compliance-narrative.json) | Evidence-cited narrative draft for review, not a legal attestation. |
+| [EXPECTED.md](https://sthenos-security.github.io/reach-testbed-go/EXPECTED.md) | Human-readable expected issue contract. |
 
 The workflow must not publish raw remediation bundles, prompt text, generated
 rule packs, skills databases, fuzz or pentest prompts, agent transcripts, raw
