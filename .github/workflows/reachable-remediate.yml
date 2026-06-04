@@ -128,6 +128,10 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Smoke DB-backed demo verdict
+        run: |
+          python3 ci/smoke-db-remediation-proof.py
+
       - name: Prepare Reachable cache directories
         run: |
           mkdir -p "$HOME/.reachable"
@@ -513,26 +517,9 @@ jobs:
       - name: Gate Reachable remediation proof
         if: ${{ inputs.remediate && !inputs.rescan_only }}
         run: |
-          python - <<'PY'
-          import json
-          import sys
-          from pathlib import Path
-
-          ledger_path = Path(".reachable/ci-artifacts/remediation-ledger.json")
-          if not ledger_path.exists():
-              print("Reachable remediation ledger is missing.", file=sys.stderr)
-              sys.exit(3)
-
-          ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
-          outcome = ledger.get("outcome") or {}
-          proof = ledger.get("proof_scan") or {}
-          status = outcome.get("status")
-          print(f"Reachable remediation outcome: {status}")
-          print(f"Reachable proof scan: {proof.get('label')} ({proof.get('results')} SARIF result(s))")
-          print(outcome.get("message") or "")
-          if status != "success":
-              sys.exit(3)
-          PY
+          # Demo verdict is DB-backed. SARIF is an export artifact and may
+          # include defended posture rows; it is not the source of truth.
+          python3 ci/check-db-remediation-proof.py .reachable/ci-artifacts
 
       - name: Commit remediation branch
         if: ${{ inputs.remediate && !inputs.rescan_only }}

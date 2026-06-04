@@ -73,6 +73,10 @@ def main() -> int:
     if ledger_path.exists():
         shutil.copy2(ledger_path, out_dir / "remediation-ledger.json")
         artifacts.append({"label": "Sanitized remediation ledger", "href": "remediation-ledger.json"})
+    db_verdict_path = ledger_path.parent / "db-remediation-verdict.json"
+    if db_verdict_path.exists():
+        shutil.copy2(db_verdict_path, out_dir / "db-remediation-verdict.json")
+        artifacts.append({"label": "DB remediation verdict", "href": "db-remediation-verdict.json"})
     expected_doc_path = Path(__file__).resolve().parents[1] / "EXPECTED.md"
     if expected_doc_path.exists():
         shutil.copy2(expected_doc_path, out_dir / "EXPECTED.md")
@@ -83,6 +87,7 @@ def main() -> int:
     summary["compliance"] = compliance
     summary["artifacts"] = artifacts
     summary["expected_demo"] = _expected_demo_summary(artifact_dir=ledger_path.parent)
+    _apply_db_verdict(summary)
     summary["ai_economics"] = _demo_ai_economics(summary["expected_demo"])
     summary["artifacts"].extend(
         [
@@ -118,6 +123,32 @@ def main() -> int:
     return 0
 
 
+def _apply_db_verdict(summary: dict[str, Any]) -> None:
+    expected_demo = summary.get("expected_demo") if isinstance(summary.get("expected_demo"), dict) else {}
+    if not expected_demo:
+        return
+    clean = bool(expected_demo.get("clean"))
+    status = "success" if clean else "needs_review"
+    message = str(expected_demo.get("headline") or "")
+    remediation = summary.get("remediation") if isinstance(summary.get("remediation"), dict) else {}
+    remediation["status"] = status
+    remediation["message"] = f"DB-backed verdict: {message}"
+    summary["remediation"] = remediation
+    verification = summary.get("verification") if isinstance(summary.get("verification"), dict) else {}
+    verification.update(
+        {
+            "status": "db_verified" if clean else "db_needs_review",
+            "mode": "DB-backed baseline/remediation proof",
+            "clean": clean,
+            "blocking_results": int(expected_demo.get("after_total") or 0),
+            "results": int(expected_demo.get("after_total") or 0),
+            "label": "repo.db expected-contract comparison",
+            "message": message,
+        }
+    )
+    summary["verification"] = verification
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -130,7 +161,10 @@ def _load_json_required(path: Path) -> dict[str, Any]:
 
 
 def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
-    expected_path = Path(__file__).resolve().parents[1] / "expected" / "baseline.json"
+    expected_path = Path(
+        os.environ.get("REACHABLE_EXPECTED_CONTRACT")
+        or Path(__file__).resolve().parents[1] / "expected" / "baseline.json"
+    )
     if not expected_path.exists():
         raise FileNotFoundError(f"expected demo contract is required: {expected_path}")
 
@@ -154,7 +188,10 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
         before_items = baseline_rows.get(key, [])
         after_items = after_rows.get(key, [])
         found_before = bool(before_items)
+        blocking_after_items = [item for item in after_items if _signal_blocks_remediation(item)]
+        defended_after_items = [item for item in after_items if not _signal_blocks_remediation(item)]
         found_after = bool(after_items)
+        blocking_after = bool(blocking_after_items)
         if found_before:
             baseline_found += 1
         else:
@@ -163,21 +200,29 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
             fixed += 1
             status = "fixed"
             status_label = "Fixed - no longer reported"
-        elif found_after:
+        elif found_before and defended_after_items and not blocking_after:
+            fixed += 1
+            status = "defended_after_remediation"
+            status_label = "Resolved - residual row is defended"
+        elif blocking_after:
             still_present += 1
             status = "still_present"
-            status_label = "Still present after remediation"
+            status_label = "Still blocking after remediation"
+        elif found_after:
+            status = "defended_after_remediation"
+            status_label = "Residual row is defended"
         else:
             status = "baseline_missing"
             status_label = "Expected baseline row was not detected"
         baseline_signal = before_items[0] if before_items else {}
-        after_signal = after_items[0] if after_items else {}
+        after_signal = (blocking_after_items or defended_after_items or after_items or [{}])[0]
         exploitability = _expected_exploitability(row, baseline_signal)
         rows.append(
             {
                 **row,
                 "found_before": found_before,
                 "found_after": found_after,
+                "blocking_after": blocking_after,
                 "status": status,
                 "status_label": status_label,
                 "baseline_signal": _public_signal(baseline_signal),
@@ -192,11 +237,11 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
         )
 
     expected_total = len(expected_rows)
-    clean = still_present == 0 and after_actionable_total == 0
+    clean = baseline_found == expected_total and still_present == 0 and after_actionable_total == 0
     if clean and baseline_found == expected_total:
-        headline = "All expected demo vulnerabilities were found and the remediation branch now scans clean."
+        headline = "All expected demo vulnerabilities were found and the remediation branch has no blocking findings."
     elif still_present == 0:
-        headline = "The remediation proof scan is clean, but the baseline contract did not fully match."
+        headline = "The remediation proof scan has no blocking findings, but the baseline contract did not fully match."
     else:
         headline = "The remediation proof scan still has expected findings to review."
 
@@ -351,20 +396,31 @@ def _public_signal(row: dict[str, Any]) -> dict[str, Any]:
 
 def _db_actionable_count(ctx: dict[str, Any]) -> int:
     conn = sqlite3.connect(Path(ctx["db_path"]))
-    return int(
-        conn.execute(
-            """
-            SELECT COUNT(*)
-              FROM signals
-             WHERE scan_id = ?
-               AND COALESCE(prod_status, 'UNKNOWN') != 'NON_PROD'
-               AND UPPER(COALESCE(app_reachability, 'UNKNOWN')) IN ('EXPLOITABLE', 'REACHABLE', 'UNKNOWN')
-               AND COALESCE(risk_level, severity, 'UNKNOWN') NOT IN ('INFO')
-            """,
-            (int(ctx["scan_id"]),),
-        ).fetchone()[0]
-        or 0
-    )
+    conn.row_factory = sqlite3.Row
+    scan_id = int(ctx["scan_id"])
+    attacker = _attacker_map(conn, scan_id)
+    rows = conn.execute(
+        """
+        SELECT signal_type, file_path, line_number, app_reachability, risk_level,
+               severity, prod_status
+          FROM signals
+         WHERE scan_id = ?
+           AND COALESCE(prod_status, 'UNKNOWN') != 'NON_PROD'
+           AND COALESCE(risk_level, severity, 'UNKNOWN') NOT IN ('INFO')
+        """,
+        (scan_id,),
+    ).fetchall()
+    count = 0
+    for raw in rows:
+        row = dict(raw)
+        path = _normalize_demo_path(str(row.get("file_path") or ""))
+        line = int(row.get("line_number") or 0)
+        row["normalized_path"] = path
+        row["line_number"] = line
+        row["attacker"] = attacker.get((_db_family(row), path, line), {})
+        if _signal_blocks_remediation(row):
+            count += 1
+    return count
 
 
 def _db_ai_usage_summary(ctx: dict[str, Any]) -> dict[str, Any]:
@@ -442,7 +498,35 @@ def _db_match_keys(row: dict[str, Any]) -> set[tuple[str, str, int]]:
     family = _db_family(row)
     path = str(row.get("normalized_path") or _normalize_demo_path(str(row.get("file_path") or "")))
     line = int(row.get("line_number") or 0)
-    return {(family, path, line)}
+    keys = {(family, path, line)}
+    cwe_id = str(row.get("cwe_id") or "").upper()
+    title = str(row.get("title") or "")
+    description = str(row.get("description") or "")
+    haystack = f" {cwe_id} {title} {description} ".lower()
+    if family == "cwe" and (cwe_id == "CWE-359" or "pii" in haystack or "data leakage" in haystack):
+        keys.add(("dlp", path, line))
+        keys.add(("ai", path, line))
+    if family == "ai" and ("pii" in haystack or "data leakage" in haystack):
+        keys.add(("dlp", path, line))
+    return keys
+
+
+def _signal_blocks_remediation(row: dict[str, Any]) -> bool:
+    if not row:
+        return False
+    attacker = row.get("attacker") if isinstance(row.get("attacker"), dict) else {}
+    if attacker:
+        if str(attacker.get("error") or "").strip():
+            return True
+        exploitable = str(attacker.get("exploitable") or "").strip().lower()
+        if exploitable in {"0", "false", "no", "not_exploitable", "defended"}:
+            return False
+        if exploitable in {"1", "true", "yes", "exploitable"}:
+            return True
+    reachability = str(row.get("app_reachability") or "").upper().replace("-", "_").replace(" ", "_")
+    if reachability in DEFENDED_STATES:
+        return False
+    return reachability in {"EXPLOITABLE", "REACHABLE", "UNKNOWN", ""}
 
 
 def _expected_exploitability(expected: dict[str, Any], signal: dict[str, Any]) -> str:
