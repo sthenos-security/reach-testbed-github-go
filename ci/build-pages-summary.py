@@ -1041,6 +1041,8 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
     after_ai = expected_demo.get("after_ai") if isinstance(expected_demo.get("after_ai"), dict) else {}
     ai_economics = summary.get("ai_economics") if isinstance(summary.get("ai_economics"), dict) else {}
     expected_class = "ok" if expected_demo.get("clean") else "bad"
+    hero_title = "Reachable fixed the vulnerable branch" if expected_demo.get("clean") else "Reachable remediation needs review"
+    hero_headline = str(expected_demo.get("headline") or "Reachable Go Demo")
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -1084,14 +1086,19 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
     .bad {{ color:var(--bad); }}
     details p {{ margin:8px 0 0; }}
     code {{ word-break:break-word; }}
+    @media (max-width: 640px) {{
+      main {{ padding:20px 12px 36px; }}
+      h1, .hero h1 {{ font-size:28px; line-height:1.1; }}
+      th, td {{ padding:8px 9px; font-size:13px; }}
+    }}
   </style>
 </head>
 <body>
   <main>
     <section class="hero {expected_class}">
-      <div class="status {expected_class}">Reachable self-remediation demo</div>
-      <h1>{html.escape(str(expected_demo.get("headline") or "Reachable Go Demo"))}</h1>
-      <p>Public, sanitized proof for the intentionally vulnerable Reachable Go testbed. The page is built from the Reachable scan database: vulnerable baseline scan, remediation proof scan, expected issue contract, branch, commit, scan number, timestamp, and AI cost telemetry. Private prompts, rules, agent transcripts, and local databases are not published.</p>
+      <div class="status {expected_class}">Reachable self-remediation demo · {html.escape(expected_status)}</div>
+      <h1>{html.escape(hero_title)}</h1>
+      <p><strong>{html.escape(hero_headline)}</strong> Public, sanitized proof for the intentionally vulnerable Reachable Go testbed. The page is built from the Reachable scan database: vulnerable baseline scan, remediation proof scan, expected issue contract, branch, commit, scan number, timestamp, and AI cost telemetry. Private prompts, rules, agent transcripts, and local databases are not published.</p>
       <div class="cards">
         {_card("Expected issues", str(expected_demo.get("expected_total", 0)))}
         {_card("Found on vulnerable main", str(expected_demo.get("baseline_found", 0)))}
