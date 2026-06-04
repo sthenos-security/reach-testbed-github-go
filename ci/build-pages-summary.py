@@ -77,6 +77,10 @@ def main() -> int:
     if db_verdict_path.exists():
         shutil.copy2(db_verdict_path, out_dir / "db-remediation-verdict.json")
         artifacts.append({"label": "DB remediation verdict", "href": "db-remediation-verdict.json"})
+    run_evidence = _copy_cache_evidence(ledger_path.parent, out_dir)
+    for item in run_evidence.get("artifacts", []):
+        if isinstance(item, dict):
+            artifacts.append(item)
     expected_doc_path = Path(__file__).resolve().parents[1] / "EXPECTED.md"
     if expected_doc_path.exists():
         shutil.copy2(expected_doc_path, out_dir / "EXPECTED.md")
@@ -86,6 +90,7 @@ def main() -> int:
     summary = _summarize(sarif=sarif, ledger=ledger, compliance=compliance)
     summary["compliance"] = compliance
     summary["artifacts"] = artifacts
+    summary["run_evidence"] = run_evidence
     summary["expected_demo"] = _expected_demo_summary(artifact_dir=ledger_path.parent)
     _apply_db_verdict(summary)
     summary["ai_economics"] = _demo_ai_economics(summary["expected_demo"])
@@ -265,6 +270,49 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
         "baseline_ai": baseline_ai,
         "after_ai": after_ai,
         "evidence_source": "repo.db",
+    }
+
+
+def _copy_cache_evidence(artifact_dir: Path, out_dir: Path) -> dict[str, Any]:
+    phases = ("before-install", "after-install", "after-scan")
+    evidence: dict[str, Any] = {"available": False, "phases": {}, "artifacts": []}
+    for phase in phases:
+        source = artifact_dir / f"reachable-cache-{phase}.json"
+        if not source.exists():
+            continue
+        target = out_dir / source.name
+        shutil.copy2(source, target)
+        payload = _load_json(source)
+        evidence["available"] = True
+        evidence["phases"][phase] = payload
+        evidence["artifacts"].append({"label": f"Run evidence: {phase}", "href": target.name})
+    evidence["summary"] = _run_evidence_summary(evidence.get("phases") or {})
+    return evidence
+
+
+def _run_evidence_summary(phases: dict[str, Any]) -> dict[str, Any]:
+    before = phases.get("before-install") if isinstance(phases.get("before-install"), dict) else {}
+    after_install = phases.get("after-install") if isinstance(phases.get("after-install"), dict) else {}
+    after_scan = phases.get("after-scan") if isinstance(phases.get("after-scan"), dict) else {}
+    latest = after_scan or after_install or before
+    before_db_count = _safe_int(before.get("repo_db_count"))
+    after_db_count = _safe_int(latest.get("repo_db_count"))
+    before_size = _safe_int(before.get("reachable_home_size_kb"))
+    after_size = _safe_int(latest.get("reachable_home_size_kb"))
+    return {
+        "cache_restored": bool(before.get("cache_restored") or after_install.get("cache_restored") or after_scan.get("cache_restored")),
+        "cache_source": latest.get("cache_source") or latest.get("provider") or "",
+        "install_mode": after_install.get("install_mode") or latest.get("install_mode") or "",
+        "target_version": latest.get("target_version") or "",
+        "installed_version": after_install.get("installed_version") or latest.get("installed_version") or "",
+        "repo_db_count_before": before_db_count,
+        "repo_db_count_after": after_db_count,
+        "repo_db_reused": before_db_count > 0 and after_db_count >= before_db_count,
+        "scan_session_count": _safe_int(latest.get("scan_session_count")),
+        "cache_size_kb_before": before_size,
+        "cache_size_kb_after": after_size,
+        "latest_repo_db_hash": str(latest.get("latest_repo_db_hash") or ""),
+        "latest_scan": (latest.get("latest_repo_db") or {}).get("latest_scan") if isinstance(latest.get("latest_repo_db"), dict) else {},
     }
 
 
@@ -965,6 +1013,8 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
     verification = summary.get("verification") or {}
     compliance = summary.get("compliance") or {}
     proof = summary.get("proof") or {}
+    run_evidence = summary.get("run_evidence") if isinstance(summary.get("run_evidence"), dict) else {}
+    run_evidence_summary = run_evidence.get("summary") if isinstance(run_evidence.get("summary"), dict) else {}
     expected_demo = summary.get("expected_demo") or {}
     defended_count = sum(int(by_reach.get(state, 0)) for state in DEFENDED_STATES)
     suspicious_count = int(summary.get("suspicious_package_count") or 0)
@@ -1056,10 +1106,12 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
       <div class="subgrid">
         {_proof_panel("Vulnerable baseline", baseline_meta, baseline_ai)}
         {_proof_panel("Remediated branch proof", after_meta, after_ai)}
+        {_run_evidence_panel(run_evidence_summary)}
       </div>
     </section>
     <nav class="tabs" aria-label="Reachable report sections">
       <a href="#expected">Expected Fix Proof</a>
+      <a href="#run-evidence">Run Evidence</a>
       <a href="#findings">Remaining Findings</a>
       <a href="#defended">Defended</a>
       <a href="#remediation">Remediation</a>
@@ -1072,6 +1124,11 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
         <thead><tr><th>Expected issue</th><th>Risk</th><th>Reachability</th><th>Exploitability</th><th>Location</th><th>Baseline</th><th>Remediation proof</th><th>Status</th><th>Fix / evidence</th></tr></thead>
         <tbody>{expected_rows}</tbody>
       </table>
+    </section>
+    <section class="card">
+      <h2 id="run-evidence">Run Evidence: Install, Cache, Database</h2>
+      <p>This section proves the CI run used an installed Reachable version and either restored or initialized the Reachable cache. The raw proof files are sanitized JSON artifacts; the demo verdict still comes from the scan database.</p>
+      {_run_evidence_table(run_evidence_summary)}
     </section>
     <h2 id="findings">Remaining Production Actionable Findings</h2>
     <div class="cards">
@@ -1134,6 +1191,48 @@ def _proof_panel(title: str, meta: dict[str, Any], ai: dict[str, Any]) -> str:
         f"<strong>AI:</strong> {ai_calls} calls, {ai_tokens:,} tokens, {html.escape(ai_cost)}</p>"
         "</div>"
     )
+
+
+def _run_evidence_panel(evidence: dict[str, Any]) -> str:
+    restored = "yes" if evidence.get("cache_restored") else "no"
+    reused = "yes" if evidence.get("repo_db_reused") else "no"
+    hash_short = str(evidence.get("latest_repo_db_hash") or "")[:12]
+    latest_scan = evidence.get("latest_scan") if isinstance(evidence.get("latest_scan"), dict) else {}
+    return (
+        '<div class="card">'
+        "<h2>CI cache / install evidence</h2>"
+        f"<p><strong>Cache restored:</strong> {html.escape(restored)}<br>"
+        f"<strong>Install mode:</strong> {html.escape(str(evidence.get('install_mode') or 'unknown'))}<br>"
+        f"<strong>Version:</strong> target {html.escape(str(evidence.get('target_version') or 'latest'))}, installed {html.escape(str(evidence.get('installed_version') or 'unknown'))}<br>"
+        f"<strong>repo.db reused:</strong> {html.escape(reused)} ({_safe_int(evidence.get('repo_db_count_before'))} before, {_safe_int(evidence.get('repo_db_count_after'))} after)<br>"
+        f"<strong>Latest DB hash:</strong> <code>{html.escape(hash_short or 'n/a')}</code><br>"
+        f"<strong>Latest scan:</strong> #{html.escape(str(latest_scan.get('id') or 'n/a'))} commit <code>{html.escape(str(latest_scan.get('commit_short') or latest_scan.get('commit_hash') or 'n/a'))}</code></p>"
+        "</div>"
+    )
+
+
+def _run_evidence_table(evidence: dict[str, Any]) -> str:
+    if not evidence:
+        return '<p class="bad">Run evidence JSON was not produced.</p>'
+    rows = [
+        ("Cache restored", "yes" if evidence.get("cache_restored") else "no"),
+        ("Cache source", str(evidence.get("cache_source") or "")),
+        ("Install mode", str(evidence.get("install_mode") or "")),
+        ("Target version", str(evidence.get("target_version") or "latest")),
+        ("Installed version", str(evidence.get("installed_version") or "")),
+        ("repo.db reused", "yes" if evidence.get("repo_db_reused") else "no"),
+        ("repo.db count before", str(_safe_int(evidence.get("repo_db_count_before")))),
+        ("repo.db count after", str(_safe_int(evidence.get("repo_db_count_after")))),
+        ("Scan sessions after", str(_safe_int(evidence.get("scan_session_count")))),
+        ("Cache size before", f"{_safe_int(evidence.get('cache_size_kb_before')):,} KB"),
+        ("Cache size after", f"{_safe_int(evidence.get('cache_size_kb_after')):,} KB"),
+        ("Latest repo.db hash", str(evidence.get("latest_repo_db_hash") or "")),
+    ]
+    body = "\n".join(
+        f"<tr><th>{html.escape(label)}</th><td><code>{html.escape(value)}</code></td></tr>"
+        for label, value in rows
+    )
+    return f"<table><tbody>{body}</tbody></table>"
 
 
 def _demo_ai_economics(expected_demo: dict[str, Any]) -> dict[str, Any]:
@@ -1318,6 +1417,8 @@ def _render_markdown(*, summary: dict[str, Any], page_url: str, code_scanning_ur
     verification = summary.get("verification") or {}
     compliance = summary.get("compliance") or {}
     proof = summary.get("proof") or {}
+    run_evidence = summary.get("run_evidence") if isinstance(summary.get("run_evidence"), dict) else {}
+    run_evidence_summary = run_evidence.get("summary") if isinstance(run_evidence.get("summary"), dict) else {}
     defended_count = sum(int(by_reach.get(state, 0)) for state in DEFENDED_STATES)
     suspicious_count = int(summary.get("suspicious_package_count") or 0)
     lines = [
@@ -1345,6 +1446,11 @@ def _render_markdown(*, summary: dict[str, Any], page_url: str, code_scanning_ur
         f"- Verification proof scan: `{verification.get('label', 'selected-sarif')}`",
         f"- Verification remaining SARIF results: `{verification.get('results', 0)}`",
         f"- Remediation status: `{remediation.get('status', 'unknown')}`",
+        f"- Cache restored: `{str(bool(run_evidence_summary.get('cache_restored'))).lower()}`",
+        f"- Install mode: `{run_evidence_summary.get('install_mode', 'unknown')}`",
+        f"- Reachable version: `{run_evidence_summary.get('installed_version') or 'unknown'}`",
+        f"- repo.db reuse: `{str(bool(run_evidence_summary.get('repo_db_reused'))).lower()}` (`{run_evidence_summary.get('repo_db_count_before', 0)}` before, `{run_evidence_summary.get('repo_db_count_after', 0)}` after)",
+        f"- Cached scan sessions: `{run_evidence_summary.get('scan_session_count', 0)}`",
         f"- Compliance evidence pack: `{('available from Pages' if compliance.get('available') else 'not available')}`",
         f"- Compliance narrative draft: `{('available from Pages' if compliance.get('narrative_markdown') else 'not available')}`",
         f"- Pages summary: {page_url or 'available after Pages deployment'}",

@@ -138,26 +138,39 @@ jobs:
 
       - name: Restore Reachable cache
         id: reachable-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.reachable
-          key: reachable-${{ runner.os }}-${{ github.repository_id }}-${{ env.REACHABLE_VERSION }}-${{ hashFiles('**/go.sum', '**/go.mod', '**/package-lock.json', '**/pnpm-lock.yaml', '**/yarn.lock', '**/requirements*.txt', '**/poetry.lock', '**/uv.lock', '**/Pipfile.lock', '**/Cargo.lock', '**/Gemfile.lock', '**/pom.xml', '**/build.gradle*', '**/*.csproj') }}
+          key: reachable-${{ runner.os }}-${{ github.repository_id }}-${{ env.REACHABLE_VERSION }}-${{ hashFiles('**/go.sum', '**/go.mod', '**/package-lock.json', '**/pnpm-lock.yaml', '**/yarn.lock', '**/requirements*.txt', '**/poetry.lock', '**/uv.lock', '**/Pipfile.lock', '**/Cargo.lock', '**/Gemfile.lock', '**/pom.xml', '**/build.gradle*', '**/*.csproj') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            reachable-${{ runner.os }}-${{ github.repository_id }}-${{ env.REACHABLE_VERSION }}-${{ hashFiles('**/go.sum', '**/go.mod', '**/package-lock.json', '**/pnpm-lock.yaml', '**/yarn.lock', '**/requirements*.txt', '**/poetry.lock', '**/uv.lock', '**/Pipfile.lock', '**/Cargo.lock', '**/Gemfile.lock', '**/pom.xml', '**/build.gradle*', '**/*.csproj') }}-
             reachable-${{ runner.os }}-${{ github.repository_id }}-${{ env.REACHABLE_VERSION }}-
             reachable-${{ runner.os }}-${{ github.repository_id }}-
             reachable-${{ runner.os }}-
 
       - name: Reachable cache status
+        env:
+          REACHABLE_CACHE_PRIMARY_KEY: ${{ steps.reachable-cache.outputs.cache-primary-key }}
+          REACHABLE_CACHE_MATCHED_KEY: ${{ steps.reachable-cache.outputs.cache-matched-key }}
+          REACHABLE_CACHE_RESTORED: ${{ steps.reachable-cache.outputs.cache-matched-key != '' }}
+          REACHABLE_CACHE_SOURCE: github-actions
         run: |
           echo "Repository telemetry:"
           echo "  tracked files: $(git ls-files | wc -l | xargs)"
           echo "  checkout size: $(du -sh . | awk '{print $1}')"
-          if [ "${{ steps.reachable-cache.outputs.cache-hit }}" = "true" ]; then
-            echo "Reachable cache active: warm cache restored from GitHub Actions cache."
+          echo "Reachable cache evidence:"
+          echo "  primary key: ${{ steps.reachable-cache.outputs.cache-primary-key }}"
+          echo "  matched key: ${{ steps.reachable-cache.outputs.cache-matched-key }}"
+          if [ -n "${{ steps.reachable-cache.outputs.cache-matched-key }}" ]; then
+            echo "  REACHABLE_CACHE_RESTORED=true"
+            echo "  install mode: overlay/upgrade existing ~/.reachable cache"
           else
-            echo "Reachable cache active: cold start; this run will populate GitHub Actions cache."
+            echo "  REACHABLE_CACHE_RESTORED=false"
+            echo "  install mode: fresh ~/.reachable cache"
           fi
-          du -sh "$HOME/.reachable" 2>/dev/null || true
+          echo "  cache size: $(du -sh "$HOME/.reachable" 2>/dev/null | awk '{print $1}' || echo 0)"
+          echo "  cached repo.db count: $(find "$HOME/.reachable/scans" -name repo.db 2>/dev/null | wc -l | xargs)"
+          python3 ci/reachable-cache-evidence.py before-install
 
       - name: Resolve remediation mode
         run: |
@@ -243,24 +256,26 @@ jobs:
           fi
 
       - name: Install Reachable
+        env:
+          REACHABLE_CACHE_PRIMARY_KEY: ${{ steps.reachable-cache.outputs.cache-primary-key }}
+          REACHABLE_CACHE_MATCHED_KEY: ${{ steps.reachable-cache.outputs.cache-matched-key }}
+          REACHABLE_CACHE_RESTORED: ${{ steps.reachable-cache.outputs.cache-matched-key != '' }}
+          REACHABLE_CACHE_SOURCE: github-actions
         run: |
           set -euo pipefail
-          if command -v reachctl >/dev/null 2>&1; then
-            reachctl --version
-          else
-            install_script="${RUNNER_TEMP:-/tmp}/reachable-install.sh"
-            installer_url="${REACHABLE_INSTALL_URL:-https://raw.githubusercontent.com/${REACHABLE_DIST_REPO}/main/install.sh}"
-            install_args=()
-            if [ -n "$REACHABLE_VERSION" ]; then
-              install_args+=(--version "$REACHABLE_VERSION")
-            fi
-            curl -fsSL "$installer_url" -o "$install_script"
-            bash "$install_script" "${install_args[@]}"
-            echo "$HOME/.reachable/venv/bin" >> "$GITHUB_PATH"
-            echo "$HOME/.reachable/tools/bin" >> "$GITHUB_PATH"
-            export PATH="$HOME/.reachable/venv/bin:$HOME/.reachable/tools/bin:$PATH"
-            reachctl version
+          echo "$HOME/.reachable/venv/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.reachable/tools/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.reachable/venv/bin:$HOME/.reachable/tools/bin:$PATH"
+          install_script="${RUNNER_TEMP:-/tmp}/reachable-install.sh"
+          installer_url="${REACHABLE_INSTALL_URL:-https://raw.githubusercontent.com/${REACHABLE_DIST_REPO}/main/install.sh}"
+          install_args=(--update)
+          if [ -n "$REACHABLE_VERSION" ]; then
+            install_args+=(--version "$REACHABLE_VERSION")
           fi
+          curl -fsSL "$installer_url" -o "$install_script"
+          bash "$install_script" "${install_args[@]}"
+          reachctl version
+          python3 ci/reachable-cache-evidence.py after-install
 
       - name: Reachable LOC telemetry
         run: |
@@ -293,9 +308,17 @@ jobs:
 
       - name: Reachable cache populated
         if: always()
+        env:
+          REACHABLE_CACHE_PRIMARY_KEY: ${{ steps.reachable-cache.outputs.cache-primary-key }}
+          REACHABLE_CACHE_MATCHED_KEY: ${{ steps.reachable-cache.outputs.cache-matched-key }}
+          REACHABLE_CACHE_RESTORED: ${{ steps.reachable-cache.outputs.cache-matched-key != '' }}
+          REACHABLE_CACHE_SOURCE: github-actions
         run: |
-          echo "Reachable cache active: post-scan cache/scans/tool state below."
-          du -sh "$HOME/.reachable" 2>/dev/null || true
+          echo "Reachable cache evidence after scan/install:"
+          echo "  cache size: $(du -sh "$HOME/.reachable" 2>/dev/null | awk '{print $1}' || echo 0)"
+          echo "  repo.db count: $(find "$HOME/.reachable/scans" -name repo.db 2>/dev/null | wc -l | xargs)"
+          echo "  scan session count: $(find "$HOME/.reachable/scans" -mindepth 3 -maxdepth 3 -type d -name '20*' 2>/dev/null | wc -l | xargs)"
+          python3 ci/reachable-cache-evidence.py after-scan
 
       - name: Upload baseline artifacts
         uses: actions/upload-artifact@v4
@@ -652,6 +675,16 @@ jobs:
             echo "GitHub code scanning SARIF: $target"
           fi
 
+      - name: Record final Reachable cache evidence
+        if: always()
+        env:
+          REACHABLE_CACHE_PRIMARY_KEY: ${{ steps.reachable-cache.outputs.cache-primary-key }}
+          REACHABLE_CACHE_MATCHED_KEY: ${{ steps.reachable-cache.outputs.cache-matched-key }}
+          REACHABLE_CACHE_RESTORED: ${{ steps.reachable-cache.outputs.cache-matched-key != '' }}
+          REACHABLE_CACHE_SOURCE: github-actions
+        run: |
+          python3 ci/reachable-cache-evidence.py after-scan
+
       - name: Build public Reachable Pages summary
         if: always() && inputs.remediate && !inputs.rescan_only
         run: |
@@ -732,6 +765,13 @@ jobs:
           if-no-files-found: ignore
           path: |
             .reachable/ci-artifacts/**
+
+      - name: Save updated Reachable cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.reachable
+          key: ${{ steps.reachable-cache.outputs.cache-primary-key }}
 
       - name: Configure GitHub Pages
         if: always() && github.event_name != 'pull_request' && inputs.remediate && !inputs.rescan_only
