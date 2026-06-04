@@ -614,7 +614,11 @@ jobs:
           # It is only for the in-run agent handoff; Pages and public artifacts
           # must contain the sanitized ledger/report data, never prompt.md,
           # bundle.json, rules.json, or private agent transcripts.
-          reachctl remediate --workspace . --cleanup
+          if command -v reachctl >/dev/null 2>&1; then
+            reachctl remediate --workspace . --cleanup
+          else
+            echo "Reachable was not installed; skipping remediation bundle cleanup."
+          fi
           if find .reachable/ci-artifacts \
               \( -name prompt.md -o -name bundle.json -o -name rules.json -o -path '*/ai-rules/*' \) \
               -print -quit | grep -q .; then
