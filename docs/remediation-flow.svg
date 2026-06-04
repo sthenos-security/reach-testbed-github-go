@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="820" viewBox="0 0 1600 820" role="img" aria-labelledby="title desc">
-  <title id="title">Reachable CI Autoremediation Flow</title>
-  <desc id="desc">High-level CI flow from code change to Reachable scan, coding agent remediation, proof scan, evidence pack, branch, and pull request.</desc>
+  <title id="title">Reachable CI Remediation Evidence Flow</title>
+  <desc id="desc">High-level CI flow from code change to Reachable scan database, coding agent remediation, proof scan database, evidence pack, branch, and pull request.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#07111f"/>
@@ -47,8 +47,8 @@
   <path d="M128 710 C314 664 482 694 650 730 C826 768 1032 744 1216 684 C1350 640 1460 646 1530 690" fill="none" stroke="#164b44" stroke-width="3" opacity="0.55"/>
 
   <text x="72" y="70" class="tiny" fill="#68d9ff">REACHABLE</text>
-  <text x="72" y="116" class="label text">CI Autoremediation, Without a Human Bottleneck</text>
-  <text x="72" y="150" class="body muted">A safe branch-first loop: scan, generate bounded prompts, let the selected agent fix, then prove the result.</text>
+  <text x="72" y="116" class="label text">CI Remediation with DB-Backed Proof</text>
+  <text x="72" y="150" class="body muted">A safe branch-first loop: scan, remediate, rescan, and publish traceable evidence.</text>
   <text x="1330" y="72" class="tiny muted">DEVOPS VIEW</text>
 
   <rect x="70" y="212" width="235" height="150" class="card"/>
@@ -56,7 +56,7 @@
   <path d="M105 260 h26 M118 247 v26" stroke="#78d7ff" stroke-width="4" stroke-linecap="round"/>
   <text x="152" y="252" class="tiny muted">TRIGGER</text>
   <text x="100" y="303" class="label text">Code Change</text>
-  <text x="100" y="333" class="body muted">push or manual run</text>
+  <text x="100" y="333" class="body muted">CI workflow trigger</text>
 
   <path class="line" d="M315 287 H418"/>
 
@@ -66,7 +66,7 @@
   <text x="462" y="306" class="body muted">signals, reachability,</text>
   <text x="462" y="332" class="body muted">SARIF, supply chain</text>
   <rect x="462" y="348" width="160" height="36" class="badge"/>
-  <text x="482" y="372" class="mono" fill="#b9c8dc">repo evidence</text>
+  <text x="482" y="372" class="mono" fill="#b9c8dc">repo.db proof</text>
 
   <path class="line" d="M728 287 H827"/>
 
@@ -82,11 +82,11 @@
 
   <rect x="1250" y="190" width="280" height="195" class="card"/>
   <text x="1282" y="234" class="tiny" fill="#39d2c0">BUNDLE</text>
-  <text x="1282" y="274" class="label text">Prompt Batch</text>
+  <text x="1282" y="274" class="label text">Fix Batch</text>
   <text x="1282" y="306" class="body muted">bounded fixes with</text>
   <text x="1282" y="332" class="body muted">rescan proof</text>
   <rect x="1282" y="348" width="176" height="36" class="badge"/>
-  <text x="1302" y="372" class="mono" fill="#b9c8dc">audit artifact</text>
+  <text x="1302" y="372" class="mono" fill="#b9c8dc">bounded task</text>
 
   <path class="line2" d="M986 396 V496 H308 V386"/>
   <text x="514" y="483" class="mono" fill="#6debdc">scan-only path: audit + publish findings, no agent writes</text>
@@ -95,9 +95,9 @@
 
   <rect x="1110" y="485" width="420" height="185" class="agentCard"/>
   <text x="1144" y="529" class="tiny" fill="#9debdc">AGENT EXECUTOR</text>
-  <text x="1144" y="569" class="label text">Claude, Codex, OpenCode</text>
-  <text x="1144" y="602" class="body muted">Cursor or any command agent</text>
-  <text x="1144" y="628" class="body muted">gets prompts + guardrails</text>
+  <text x="1144" y="569" class="label text">Codex or Claude</text>
+  <text x="1144" y="602" class="body muted">edits remediation branch</text>
+  <text x="1144" y="628" class="body muted">from bounded task data</text>
   <rect x="1144" y="642" width="96" height="36" class="badge"/>
   <text x="1163" y="666" class="mono" fill="#b9c8dc">agent</text>
   <rect x="1252" y="642" width="104" height="36" class="badge"/>
@@ -118,8 +118,8 @@
   <rect x="360" y="485" width="278" height="185" class="card"/>
   <text x="392" y="529" class="tiny" fill="#39d2c0">PROOF</text>
   <text x="392" y="569" class="label text">Rescan + Proof</text>
-  <text x="392" y="602" class="body muted">Reachable rescan, SARIF</text>
-  <text x="392" y="628" class="body muted">and GRC evidence pack</text>
+  <text x="392" y="602" class="body muted">Reachable proof DB</text>
+  <text x="392" y="628" class="body muted">and evidence pack</text>
   <rect x="392" y="642" width="170" height="36" class="success"/>
   <text x="413" y="666" class="mono" fill="#8ef4d4">zero actionable</text>
 
@@ -133,5 +133,5 @@
 
   <rect x="70" y="726" width="1460" height="48" rx="24" fill="#0b1524" stroke="#20354f" stroke-width="2"/>
   <rect x="90" y="739" width="220" height="22" rx="11" fill="url(#accent)"/>
-  <text x="330" y="756" class="mono" fill="#b9c8dc">Operator knobs: remediate, agent, provider, model, signal families, max batches, rescan strategy, evidence, PR creation</text>
+  <text x="330" y="756" class="mono" fill="#b9c8dc">CI controls: scan-only, remediate, verify branch, bounded batches, PR creation, evidence publish</text>
 </svg>

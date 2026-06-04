@@ -10,7 +10,7 @@ deployed.
 
 ## Golden Baseline
 
-The machine-readable contract is [expected/baseline.json](expected/baseline.json).
+The machine-readable contract is `expected/baseline.json` in the repository.
 CI validates the baseline database against that contract before remediation.
 
 | Baseline dimension | Expected |

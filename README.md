@@ -1,51 +1,62 @@
 # reach-testbed-go
 
 Intentionally vulnerable Go fixture repository for demonstrating Reachable
-CI/CD scanning and automated remediation with coding agents.
+CI/CD scanning, agentic remediation, and DB-backed post-fix proof.
 
 > Do not deploy this application. It contains synthetic security issues for
-> scanner validation only.
+> scanner validation and customer demos only.
 
-![Reachable CI autoremediation flow](docs/remediation-flow.svg)
+![Reachable CI remediation flow](docs/remediation-flow.svg)
 
-## What This Demo Proves
+## Demo Verdict
 
-This repository is the compact Go demo for the Reachable remediation workflow:
-
-1. Reachable scans the repository and records database-backed signal truth.
-2. Reachable generates a bounded remediation prompt bundle.
-3. A selected coding agent applies one or more serialized fix batches.
-4. CI rescans the branch, audits, and verifies integrity.
-5. CI opens one reviewable `reachable-remediate-*` branch and pull request.
-
-The process is intentionally branch-first. The safe default is scan-only:
-`remediate=false` means CI will not edit code.
-
-## Public Demo Pages
-
-The latest public scan/remediation summary is published to GitHub Pages:
+The public demo page is the customer-facing proof view:
 
 <https://sthenos-security.github.io/reach-testbed-go/>
 
-This is the customer-friendly view for demos. It lists the last selected SARIF
-report, production actionable exploitable/reachable/unknown signals, defended
-or defendable controls, suspicious packages, malware, DLP/PII, OWASP Web Top
-10, OWASP AI/LLM, proof-run counts, remediation ledger status, and links back
-to the Actions run and GitHub code scanning. It is a sanitized mini-dashboard,
-not the full local Reachable dashboard: raw prompt bundles, proof witnesses,
-exploit payloads, agent transcripts, local databases, private logs, and
-generated rule internals are not published.
+That page is built from Reachable scan evidence. It shows:
 
-If the repository is private on a GitHub plan that does not include Pages, the
-workflow still uploads the same mini-dashboard files under
-`.reachable/ci-artifacts/pages` in the Actions artifact. The public link starts
-working once GitHub Pages is enabled, for example after making the demo
-repository public.
+| Evidence | What the customer should understand |
+|----------|-------------------------------------|
+| Vulnerable baseline | The known vulnerable `main` branch was scanned and matched the expected issue contract. |
+| Remediation branch | CI created a reviewable remediation branch and applied the agent fixes there. |
+| Proof scan | Reachable rescanned the remediated branch and compared the result to the expected contract. |
+| Final verdict | The demo passes only when the proof database has zero production-actionable findings. |
+| Audit metadata | Branch, commit, scan number, timestamp, runtime, AI token count, and estimated AI cost are displayed for traceability. |
+| Sanitized artifacts | Convenience exports are linked for review; private prompts, rules, agent transcripts, raw witnesses, and local databases are not published. |
 
-## Expected Results
+The scan database is the source of truth for the demo verdict. SARIF is still
+generated for GitHub Code Scanning compatibility, but it is not the authority
+for the pass/fail claim.
 
-The customer-facing baseline manifest lives in [EXPECTED.md](EXPECTED.md). The
-static demo page lives in [docs/expected-results.html](docs/expected-results.html).
+## CI Validation Flow
+
+The workflow in [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml)
+is the implementation. At a high level, each demo run follows this sequence:
+
+1. CI checks out the vulnerable baseline branch.
+2. Reachable installs or updates, records cache evidence, and scans the
+   baseline into `repo.db`.
+3. The baseline database is compared with [expected/baseline.json](expected/baseline.json).
+   A mismatch fails the run because the testbed contract is no longer intact.
+4. Reachable synthesizes a bounded remediation request from the database.
+5. The selected coding agent edits a dedicated `reachable-remediate-*` branch.
+6. The project test command runs to catch ordinary build or behavior breaks.
+7. Reachable rescans the remediation branch into a new proof database.
+8. The proof database is compared with the expected contract. The pass
+   condition is zero remaining production-actionable findings.
+9. CI publishes a sanitized Pages report and support artifacts with the exact
+   scan IDs, branch names, commits, timestamps, runtime, cache state, and AI
+   cost telemetry.
+
+This is branch-first by design. The tool fixes code on a remediation branch so
+a release manager can inspect the diff, verify the proof, and merge only after
+normal review.
+
+## Expected Findings
+
+The expected vulnerable contract is documented in [EXPECTED.md](EXPECTED.md)
+and enforced by [expected/baseline.json](expected/baseline.json).
 
 Current golden baseline:
 
@@ -53,337 +64,74 @@ Current golden baseline:
 |--------|----------|
 | Raw DB signals | 28 |
 | Action Required before remediation | 18 |
-| Public SARIF posture rows | 21 |
+| Public posture export rows | 21 |
 | Families | CVE, CWE, secret, DLP, AI |
+| Attack Prompt verdicts | 9 exploitable, 3 defended, 0 errors |
 | Actionable after remediation | 0 |
-| Residual post-fix findings | No production-actionable SARIF rows; filtered `NON_PROD` or `NOT_REACHABLE` fixture markers may remain in the DB. |
+| Residual post-fix findings | Only filtered `NON_PROD` or `NOT_REACHABLE` fixture markers may remain in the database. |
 
-The baseline is machine-checked by
-[expected/baseline.json](expected/baseline.json) and
-[ci/validate-expected-results.py](ci/validate-expected-results.py). The
-validator compares the scan database and SARIF export so the demo can assert a
-100% expected-result match instead of relying on screenshots.
+The testbed itself is the contract. Do not edit the vulnerable fixture or the
+expected manifest just to make a scan pass; scanner logic must conform to the
+golden behavior.
 
-## Layout
+## Published Artifacts
 
-```text
-cmd/server/              HTTP entrypoint and route registration
-internal/handlers/       Reachable, defended, and assess signal cases
-internal/safety/         Guard helpers used by defended cases
-config/                  Synthetic insecure configuration cases
-deploy/                  Synthetic IaC cases
-testdata/dlp/            Synthetic DLP corpus
-docs/remediation-flow.svg High-level customer-safe process diagram
-EXPECTED.md              Customer-facing baseline manifest
-.github/workflows/       Drop-in remediation workflow template
-ci/run-agent.sh          Agent executor shim used by CI and local runs
-```
+The Pages report links a small set of public artifacts. These are review aids,
+not private execution material.
 
-## Optional Local App Smoke Test
+| Artifact | Purpose |
+|----------|---------|
+| `summary.json` / `summary.md` | Compact DB-backed run summary for the public page. |
+| `db-remediation-verdict.json` | Machine-readable baseline/proof comparison and final verdict. |
+| `reachable.sarif` | Compatibility export for GitHub Code Scanning. |
+| `remediation-ledger.json` | Sanitized remediation summary with rule IDs and outcomes, not prompt text. |
+| `compliance.md` / `compliance.json` | DB-backed compliance evidence extract. |
+| `compliance-narrative.md` / `compliance-narrative.json` | Evidence-cited narrative draft for review, not a legal attestation. |
+| `EXPECTED.md` | Human-readable expected issue contract. |
 
-```bash
-go test ./...
-go run ./cmd/server
-```
+The workflow must not publish raw remediation bundles, prompt text, generated
+rule packs, skills databases, fuzz or pentest prompts, agent transcripts, raw
+witness payloads, or local `repo.db` files.
 
-The service listens on `:8080` by default. The remediation CI demo does not
-run application tests; its proof is the final Reachable scan, audit, integrity
-check, SARIF upload, and remediation ledger.
+## Inputs And Guardrails
 
-## Local Remediation Harness
+The demo supports two simple CI lanes:
 
-Agentic remediation is not a `reachctl scan` flag. The scan remains the
-source-of-truth proof step. Batch remediation is:
+| Lane | Secret | Agent |
+|------|--------|-------|
+| `codex-openai` | `OPENAI_API_KEY` | Codex |
+| `claude-anthropic` | `ANTHROPIC_API_KEY` | Claude Code |
 
-```text
-reachctl scan -> reachctl remediate -> coding agent -> reachctl scan -> audit/integrity
-```
+The workflow also includes kill switches for scan-only runs, remediation
+branch verification, pull-request creation, and bounded batch size. These are
+CI controls, not customer demo steps. The public report should make the
+selected branch, commit, scan number, and final proof state obvious without
+requiring the viewer to know the workflow inputs.
 
-`reachctl vibe remediate` is the continuous local vibe-coding daemon loop. The
-workflow in this repository is different: it is a one-branch CI/manual
-remediation loop that generates a prompt bundle and invokes the selected agent
-explicitly.
-
-Run a scan-only baseline and prompt-bundle check:
-
-```bash
-cd /Users/alaindazzi/src/reach-core
-scripts/reach-testbed-go-agent-loop.sh \
-  --fixture /Users/alaindazzi/src/reach-testbed-go \
-  --base-branch main \
-  --branch reachable-remediate-demo-$(date +%Y%m%d%H%M%S)
-```
-
-Run Codex end to end locally. Local Codex usually uses the login and model
-already configured by the Codex CLI; Reachable scan credentials still come from
-`reachctl doctor` / the Reachable credential store unless you override them:
-
-```bash
-cd /Users/alaindazzi/src/reach-core
-scripts/reach-testbed-go-agent-loop.sh \
-  --fixture /Users/alaindazzi/src/reach-testbed-go \
-  --base-branch main \
-  --branch reachable-remediate-codex-$(date +%Y%m%d%H%M%S) \
-  --agent codex \
-  --run-agent \
-  --prove
-```
-
-Run Claude Code end to end locally:
-
-```bash
-cd /Users/alaindazzi/src/reach-core
-ANTHROPIC_API_KEY=... \
-scripts/reach-testbed-go-agent-loop.sh \
-  --fixture /Users/alaindazzi/src/reach-testbed-go \
-  --base-branch main \
-  --branch reachable-remediate-claude-$(date +%Y%m%d%H%M%S) \
-  --agent claude \
-  --run-agent \
-  --prove
-```
-
-## CI/CD Remediation Template
-
-The workflow at [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml)
-is written as a reusable template. It is Go-ready by default, but the same shape
-works for other languages by changing `scan_extra_flags` and the selected
-coding agent.
-
-Important manual inputs:
-
-| Input | Purpose |
-|-------|---------|
-| `remediate` | Main kill switch. `false` means scan-only proof and no code changes. |
-| `rescan_only` | Proves an existing branch without creating or editing a branch. |
-| `target_branch` | Base branch, or existing remediation branch when `rescan_only=true`. |
-| `remediation_mode` | One-key mode: `codex-openai` or `claude-anthropic`. |
-| `prompt_profile` | Remediation profile: `safe`, `balanced`, `aggressive`, `release`, or `nightly`. |
-| `signal_types` | `all`, or a comma-separated subset such as `cve,cwe,secret`. |
-| `max_batches` | Maximum serialized remediation batches. Use this to avoid huge prompts. |
-| `rescan_strategy` | `final` runs one Reachable proof scan after all batches; `each_batch` rescans after every batch. |
-| `scan_extra_flags` | Extra `reachctl scan` flags. |
-| `require_ai` | Fail early unless a Reachable scan/enrichment key is configured. Keep `true` for demos. |
-| `create_pr` | Open a PR after successful remediation. |
-
-### Verification Logic
-
-The remediation run always performs an automatic proof scan after the coding
-agent edits the `reachable-remediate-*` branch. That final scan runs
-`reachctl scan` only; it does not invoke remediation again. The proof gate
-passes only when the final SARIF contains zero production-actionable rows.
-
-Use `rescan_only=true` to manually verify an existing remediation branch later,
-for example after review comments or an extra pushed fix. In that mode the
-workflow checks out `target_branch`, runs the scan/audit/integrity steps, and
-fails the run if the verification SARIF still contains findings. It never
-creates a branch, invokes a coding agent, or edits code.
-
-The GitHub Pages mini-dashboard includes a **Verified** section showing the
-proof mode, proof scan label, remaining SARIF result count, and ledger status.
-
-### Optional Human-Approved Auto-Merge
-
-Organizations can automate the last mile without letting the agent merge code
-unilaterally:
-
-1. Reachable opens the remediation PR.
-2. Branch protection requires the proof scan, audit, integrity check, tests,
-   SARIF upload, and Pages summary to pass.
-3. A GitHub App or workflow posts a Slack/email approval request to an allowed
-   team with the compare link, proof status, and public mini-dashboard link.
-4. An authenticated approver clicks approve. The app verifies org/team
-   membership and records the approval event.
-5. The app enables GitHub auto-merge or sends the PR to the merge queue.
-
-Do not accept merge approvals from public PR comments. Approval has to be
-identity-checked against the customer org, CODEOWNERS, or an explicit
-allowlisted reviewer team.
-
-### Reset Demo Branches
-
-The manual workflow
-[`.github/workflows/reachable-demo-cleanup.yml`](.github/workflows/reachable-demo-cleanup.yml)
-removes stale remote remediation branches before rerunning a customer demo.
-By default it deletes branches matching `reachable-remediate-*` and skips any
-branch that still has an open pull request. Use `dry_run=true` to preview the
-cleanup, or `delete_open_pr_branches=true` when you intentionally want to reset
-open demo PR branches too.
-
-For the investor/customer CI demo, use one mode and one matching provider key:
-
-| Mode | Required GitHub secret | What it drives |
-|------|------------------------|----------------|
-| `codex-openai` | `OPENAI_API_KEY` | Reachable OpenAI scan/enrichment plus Codex remediation. |
-| `claude-anthropic` | `ANTHROPIC_API_KEY` | Reachable Anthropic scan/enrichment plus Claude Code remediation. |
-
-Additional supported GitHub secrets and variables:
-
-| Name | Used by |
-|------|---------|
-| `REACHABLE_API_KEY` | Optional Reachable cloud publish/org attach. |
-| `REACHABLE_GITHUB_TOKEN` | Optional fine-grained token for opening PRs when repository Actions settings block PR creation by `GITHUB_TOKEN`. Needs Contents and Pull requests write permissions. |
-| `MCP_GITHUB_TOKEN` | MCP-based agent GitHub access. |
-| `ANTHROPIC_API_KEY` | One-key `claude-anthropic` mode. |
-| `OPENAI_API_KEY` | One-key `codex-openai` mode. |
-| `REACHABLE_DIST_REPO` | Optional repository/org variable that points at the install distribution repo. Defaults to `sthenos-security/reach-dist`. |
-| `REACHABLE_VERSION` | Optional version pin for demos or customer rollouts. Defaults to latest. |
-
-`GITHUB_TOKEN` is provided by GitHub Actions. The workflow grants it write
-access to contents, pull requests, and security events so it can push the
-remediation branch, open a PR, and upload SARIF. Some repositories disable the
-GitHub Actions setting that lets the built-in token create pull requests. In
-that case the workflow still pushes the `reachable-remediate-*` branch and logs
-the branch URL; set `REACHABLE_GITHUB_TOKEN` or enable that repository setting
-when you want PR creation to be fully automatic.
-
-### CI Cache
-
-The workflow restores and saves Reachable state with `actions/cache@v4`:
+## Repository Layout
 
 ```text
-~/.reachable
+cmd/server/                HTTP entrypoint and route registration
+internal/handlers/         Vulnerable, defended, and assess signal cases
+internal/safety/           Guard helpers used by defended cases
+config/                    Synthetic insecure configuration cases
+deploy/                    Synthetic IaC cases
+testdata/dlp/              Synthetic DLP corpus
+expected/baseline.json     Machine-readable expected scanner contract
+ci/                        DB proof, page summary, and CI helper scripts
+docs/                      Public demo page assets and sanitized reports
+.github/workflows/         CI remediation and cleanup workflows
 ```
 
-The Actions log prints `Reachable cache active` before the baseline scan. A
-warm run says `warm cache restored`; the first run says `cold start` and then
-populates the cache for the next run. This keeps repeat CI scans fast by
-preserving scanner databases, package/source caches, repo scan state, and
-Reachable tool downloads. The same setup block logs repository size and then
-runs `reachctl loc .` after installation so demo operators can quote the
-same LOC telemetry that Reachable uses internally.
+## What “Fixed” Means
 
-### Published CI Reports
+For this demo, “fixed” means:
 
-Every scan writes an actionable-production SARIF issue report into
-`.reachable/ci-artifacts/`:
+1. The vulnerable baseline database contained the expected issue.
+2. The remediation branch proof database no longer contains that production
+   actionable issue.
+3. The proof gate reports zero remaining production-actionable findings.
+4. The public report displays the branch, commit, scan ID, timestamp, and
+   artifact links that produced the verdict.
 
-| File | Purpose |
-|------|---------|
-| `reachable.sarif` | Baseline issue report for GitHub code scanning. |
-| `reachable-after-batch-<n>.sarif` | Post-remediation issue report after batch `<n>`. |
-
-The SARIF report contains production actionable posture signals:
-`EXPLOITABLE`, `REACHABLE`, `UNKNOWN`, and `DEFENDED`/`DEFENDABLE`.
-`NON_PROD` and `NOT_REACHABLE` findings stay out of CI code-scanning results.
-Defended findings are included for audit context but do not fail the CI gate.
-The workflow uploads these SARIF files as artifacts and can post them to GitHub
-code scanning when the repository enables SARIF upload. The workflow also
-publishes a small GitHub Pages mini-dashboard for the latest run at
-<https://sthenos-security.github.io/reach-testbed-go/>. In CI mode we do not
-publish the full local Reachable dashboard by default; customers already have
-their build loop, and SARIF plus the sanitized Pages summary are the right
-public issue transport for CI.
-
-The workflow selects the strongest available SARIF for GitHub Code Scanning:
-final proof scan first, latest batch proof scan next, then baseline scan. The
-Actions job summary prints the selected SARIF path, production actionable
-result count, Reachable risk levels, upload outcome, and a direct link to
-`Security > Code scanning` filtered to `category:reachable`. The Pages summary
-prioritizes the top production actionable exploitable/reachable issues first,
-shows defended/defendable signals separately, then falls back to unknown
-actionable findings when no reachable issue remains. It also links the latest
-DB-backed compliance evidence pack when the installed Reachable wheel supports
-`reachctl compliance report`, plus an evidence-cited auditor narrative draft
-when the wheel supports `reachctl compliance narrative --dry-run`. When the
-selected SARIF or copied compliance JSON includes DB-backed proof state, the
-mini-dashboard shows proof profile/run totals, verified proof runs, defended
-re-attacks, and proof-needs-review counts. If GitHub rejects SARIF upload
-because code scanning is disabled for the repository, the same SARIF, Pages
-files, and proof artifacts remain attached to the workflow run.
-
-Each scan also publishes compact support/proof logs under
-`.reachable/ci-artifacts/reports/<label>/`:
-
-| File | Purpose |
-|------|---------|
-| `scan.log` | Full scan log. |
-| `audit.txt` | Data-quality and issue audit output. |
-| `integrity.txt` | SARIF/database integrity proof. |
-| `compliance.md` / `compliance.json` | DB-backed compliance evidence pack when supported by the installed Reachable wheel. |
-| `compliance-narrative.md` / `compliance-narrative.json` | Evidence-cited non-attestation auditor narrative draft when supported by the installed Reachable wheel. |
-| `scan-path.txt` | Original runner scan session path. |
-
-The Pages mini-dashboard copies the latest available compliance pack to
-`compliance.md` / `compliance.json` and the latest available narrative draft to
-`compliance-narrative.md` / `compliance-narrative.json` for public demo review.
-It still does not publish raw prompt bundles, agent transcripts, local
-databases, or private logs.
-
-The baseline scan is labeled `baseline`, rescan-only proof is labeled
-`rescan-only`, post-remediation proof scans are labeled `after-final` by
-default, and `after-batch-<n>` when `rescan_strategy=each_batch`.
-
-The workflow also writes a remediation ledger:
-
-| File | Purpose |
-|------|---------|
-| `.reachable/ci-artifacts/remediation-ledger.json` | Machine-readable before/attempt/after ledger. |
-| `.reachable/ci-artifacts/remediation-ledger.md` | Human-readable summary for PRs and support. |
-
-The ledger records what SARIF found, which Reachable rules were sent to the
-agent, which agent log corresponds to the attempt, and whether the final proof
-SARIF is clean. If findings remain, the status is
-`needs_retry_or_human_review`; the next CI batch must be generated from the
-updated branch/database state.
-
-The happy path should not retry. The agent should fix the selected batch and
-the final proof scan should be clean. Use multiple batches only when the
-remediation queue is too large or logically unrelated for one prompt. The
-default `rescan_strategy=final` is faster: scan, remediate batch or batches,
-then run one Reachable proof rescan at the end. Use `rescan_strategy=each_batch`
-when debugging or when a regulated workflow needs per-batch proof artifacts.
-
-Reachable does not own the customer's build/test loop. Customers can run this
-remediation job before, after, or inside their existing CI pipeline, but this
-template only scans, remediates, rescans, and publishes proof.
-
-## Agent Strategy
-
-Reachable owns scanning, ranking, prompt-bundle generation, audit artifacts, and
-post-fix proof. The selected coding agent only consumes `prompt.md` and edits
-the current branch.
-
-The public demo workflow treats all runner output and uploaded artifacts as
-public. It does not upload raw remediation bundles, full rule packs, skills
-databases, fuzz/pentest prompts, or agent transcripts. Reachable stores the
-durable audit in `repo.db` as sanitized metadata: prompt and bundle hashes,
-selected rule IDs, workflow inputs, before/after SARIF summaries, public
-artifact fingerprints, and outcome status. The exported ledger files are
-rendered summaries for PRs and support, not the source of truth.
-
-Generated `.reachable/remediation-bundle/` files are intentionally ignored by
-git and should be treated as ephemeral runner-local inputs. The CI shim feeds
-prompts to supported agents through stdin or file attachment instead of putting
-the full prompt in the process argument list. Agent logs are retained only in a
-private runner-local directory by default; public artifacts contain SARIF,
-audit, integrity, compliance, and sanitized remediation ledger reports.
-
-Supported CI executor modes:
-
-| Agent | Install path in template | Notes |
-|-------|--------------------------|-------|
-| Claude Code | `npm install -g @anthropic-ai/claude-code` | Best default for GitHub-hosted CI when auth is configured. |
-| Codex | `npm install -g @openai/codex` | Uses `codex exec` in non-interactive mode. |
-
-Cursor is supported as a local MCP target, but it is not a GitHub-hosted CI
-executor in this template.
-
-## No-Fix CVEs
-
-When Reachable reports a reachable CVE with no fixed version, the generated
-prompt tells the agent not to invent a dependency upgrade. The agent must add a
-compensating control when possible, such as validation, gating, isolation,
-timeouts, or explicit accepted-risk documentation.
-
-## CI Dry Run
-
-Before enabling remediation:
-
-1. Add the secrets above.
-2. Run the workflow with `remediate=false`.
-3. Confirm baseline SARIF and audit artifacts upload.
-4. Run with `remediate=true`, `remediation_mode=codex-openai` or
-   `remediation_mode=claude-anthropic`, and
-   `max_batches=1`.
-5. Review the generated `reachable-remediate-*` pull request.
+That is the story the demo page must tell. Anything else is support detail.

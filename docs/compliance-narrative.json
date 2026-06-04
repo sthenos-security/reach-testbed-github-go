@@ -1,0 +1,139 @@
+{
+  "audience": "auditor",
+  "created_at": "2026-06-04 18:50:22",
+  "db_path": "<runner-local-path-withheld>/reach-testbed-go-d6485ada/repo.db",
+  "error": null,
+  "framework": "all",
+  "id": 2,
+  "model": "evidence-citation-template",
+  "narrative_hash": "5037eef02b7efb005848567121d2b9045283226008584555ecbeaf80e42fda1d",
+  "narrative_text": "## Executive Summary\n\nThis deterministic draft is generated from stored Reachable compliance evidence rows. The source report contains 0 production-actionable signal(s), with 0 unknown production signal(s) and 0 reachable/exploitable production signal(s). \n\n## Evidence Scope\n\nThe narrative audience is `auditor`. The canonical source of truth is `repo.db`, specifically `compliance_reports` and `compliance_evidence`; this prose is not a certification or legal attestation. [evidence:53]\n\n## Open Production Risk\n\n0 evidence row(s) are currently open or under review. No open evidence rows were present.\n\n## Remediation And Human Review\n\nHuman-review outcomes recorded: 0. Policy-waiver outcomes recorded: 0. [evidence:53]\n\n## Residual Risk And Limitations\n\nThis draft only summarizes stored evidence. Missing evidence should be tracked as a DB row before being claimed in an auditor narrative.",
+  "prompt_hash": "965181f212cf80a6f850ed62a6e30eae583c67759eb7f7feb2aaeb5cd349c385",
+  "provider": "deterministic",
+  "report_id": 2,
+  "report_summary": {
+    "ai_bom_counts": {
+      "by_confidence": {},
+      "by_entry_type": {},
+      "by_sink_type": {},
+      "by_source_type": {},
+      "samples": [],
+      "total": 0
+    },
+    "ai_boundary_counts": {
+      "agentic_output": 0,
+      "by_confidence": {},
+      "by_sink_type": {},
+      "by_source_type": {},
+      "llm_output": 0,
+      "samples": [],
+      "total": 0
+    },
+    "counts": {
+      "actionable_production": 0,
+      "non_production": 7,
+      "not_reachable": 8,
+      "reachable_production": 0,
+      "remediation_units": 0,
+      "total_signals": 8,
+      "unknown_production": 0
+    },
+    "created_at": "2026-06-04T18:50:21.928003+00:00",
+    "feedback_counts": {
+      "by_kind": {},
+      "by_recommended_action": {},
+      "by_status": {},
+      "needs_human_review": 0,
+      "policy_waiver": 0,
+      "total": 0
+    },
+    "fingerprint": "1a5fc732e4a391d2e9c0693838c379b8d860508dd554ad319c922c223b9df661",
+    "framework": "all",
+    "framework_label": "All frameworks",
+    "governance_counts": {
+      "by_pack": {},
+      "by_status": {},
+      "total": 0
+    },
+    "overall_status": "pass",
+    "prod_status_counts": {
+      "NON_PROD": 7,
+      "UNKNOWN": 1
+    },
+    "proof_prompt_counts": {
+      "attack_path": 0,
+      "by_family": {},
+      "by_mode": {},
+      "by_signal_type": {},
+      "mcp_rag": 0,
+      "mcp_rag_primitives": {},
+      "runs_with_proof_prompts": 0,
+      "total": 0
+    },
+    "proof_run_counts": {
+      "by_phase": {},
+      "by_profile_kind": {},
+      "by_profile_status": {},
+      "by_state": {},
+      "defended_after_reattack": 0,
+      "failed": 0,
+      "needs_review": 0,
+      "samples": [],
+      "skipped_policy": 0,
+      "total_profiles": 0,
+      "total_runs": 0,
+      "verified_exploitable": 0
+    },
+    "reachability_counts": {
+      "NOT_REACHABLE": 8
+    },
+    "risk_counts": {
+      "INFO": 7,
+      "LOW": 1
+    },
+    "scan": {
+      "branch": "reachable-remediate-26972297438",
+      "commit_hash": "8abd78310ce1a9f20fa6468725b802d297175743",
+      "commit_short": "8abd7831",
+      "config_count": 0,
+      "critical_count": 0,
+      "duration_seconds": 5.03,
+      "high_count": 0,
+      "id": 4,
+      "low_count": 0,
+      "medium_count": 0,
+      "reachable_findings": 0,
+      "risk_level": "NONE",
+      "risk_score": 0,
+      "scan_dir": "<runner-local-path-withheld>/reach-testbed-go-d6485ada/reachable-remediate-26972297438/20260604-185016-59ceb1",
+      "source_files_scanned": 28,
+      "status": "complete",
+      "timestamp": "2026-06-04 18:50:16",
+      "total_findings": 8,
+      "unknown_count": 0,
+      "version": "1.0.0b101"
+    },
+    "schema_version": 4,
+    "signal_type_counts": {
+      "CWE": 2,
+      "SECRET": 6
+    },
+    "status_counts": {
+      "pass": 9
+    },
+    "top_findings": []
+  },
+  "scan_id": 4,
+  "source_evidence_ids": [
+    53,
+    60,
+    57,
+    55,
+    58,
+    59,
+    54,
+    56,
+    61
+  ],
+  "status": "ready"
+}

@@ -1,0 +1,281 @@
+{
+  "attempts": [
+    {
+      "agent_log": ".reachable/private-agent-logs/agent-batch-1.log",
+      "agent_log_public_artifact": false,
+      "batch": 1,
+      "bundle_path": ".reachable/remediation-bundle/bundle.json",
+      "selected_packages": [
+        "golang.org/x/text"
+      ],
+      "selected_rule_count": 12,
+      "selected_rules": [
+        {
+          "backing_signal_count": 1,
+          "finding_ids": [],
+          "packages": [],
+          "priority_score": 1000,
+          "remediation_key": null,
+          "rule_id": "RCH-RULE-877450ee",
+          "signal_families": [
+            "cwe"
+          ],
+          "title": "OS command injection via exec.Command with shell"
+        },
+        {
+          "backing_signal_count": 2,
+          "finding_ids": [],
+          "packages": [
+            "golang.org/x/text v0.3.7"
+          ],
+          "priority_score": 523,
+          "remediation_key": "golang.org/x/text@v0.3.7",
+          "rule_id": "RCH-RULE-4c957bd8",
+          "signal_families": [
+            "cve"
+          ],
+          "title": "Do not introduce vulnerable dependency golang.org/x/text@v0.3.7"
+        },
+        {
+          "backing_signal_count": 1,
+          "finding_ids": [],
+          "packages": [],
+          "priority_score": 422,
+          "remediation_key": null,
+          "rule_id": "RCH-RULE-df212f4e",
+          "signal_families": [
+            "ai"
+          ],
+          "title": "Unguarded data flow from http_param to code_exec"
+        },
+        {
+          "backing_signal_count": 1,
+          "finding_ids": [],
+          "packages": [],
+          "priority_score": 120,
+          "remediation_key": null,
+          "rule_id": "RCH-RULE-b4ff9103",
+          "signal_families": [
+            "secret"
+          ],
+          "title": "Uncovered a GitHub Personal Access Token, potentially leading to unauthorized repository access and sensitive content exposure.: ghp_***00"
+        },
+        {
+          "backing_signal_count": 1,
+          "finding_ids": [],
+          "packages": [],
+          "priority_score": 1000,
+          "remediation_key": null,
+          "rule_id": "RCH-RULE-27bd65de",
+          "signal_families": [
+            "cwe"
+          ],
+          "title": "http.Get / http.Client.Do called with a URL derived from user input \u2014 CWE-918 SSRF. Validate the host against an allowlist, or use a proxying client that block\u2026"
+        },
+        {
+          "backing_signal_count": 3,
+          "finding_ids": [],
+          "packages": [],
+          "priority_score": 904,
+          "remediation_key": null,
+          "rule_id": "RCH-RULE-1ab079af",
+          "signal_families": [
+            "cwe"
+          ],
+          "title": "HTTP POST with PII payload \u2014 data leakage risk (3 proven sites)"
+        },
+        {
+          "backing_signal_count": 1,
+          "finding_ids": [],
+          "packages": [],
+          "priority_score": 904,
+          "remediation_key": null,
+          "rule_id": "RCH-RULE-604223bd",
+          "signal_families": [
+            "cwe"
+          ],
+          "title": "PII data (SSN, DOB, credit card) in Go log output"
+        },
+        {
+          "backing_signal_count": 1,
+          "finding_ids": [],
+          "packages": [],
+          "priority_score": 904,
+          "remediation_key": null,
+          "rule_id": "RCH-RULE-8bb65d1e",
+          "signal_families": [
+            "cwe"
+          ],
+          "title": "User-controlled URL passed to HTTP client without TLS scheme validation \u2014 sensitive data may be sent in cleartext (CWE-319). Validate that the URL scheme is \"h\u2026"
+        },
+        {
+          "backing_signal_count": 1,
+          "finding_ids": [],
+          "packages": [],
+          "priority_score": 903,
+          "remediation_key": null,
+          "rule_id": "RCH-RULE-217c2dae",
+          "signal_families": [
+            "cwe"
+          ],
+          "title": "Unauthenticated admin and diagnostic endpoints"
+        },
+        {
+          "backing_signal_count": 9,
+          "finding_ids": [],
+          "packages": [],
+          "priority_score": 902,
+          "remediation_key": null,
+          "rule_id": "RCH-RULE-d990ae0f",
+          "signal_families": [
+            "cwe"
+          ],
+          "title": "Internal error details written to HTTP response \u2014 exposes server internals (table names, paths, stack traces) to clients. Return a generic error message and lo\u2026"
+        },
+        {
+          "backing_signal_count": 1,
+          "finding_ids": [],
+          "packages": [],
+          "priority_score": 422,
+          "remediation_key": null,
+          "rule_id": "RCH-RULE-a755ac83",
+          "signal_families": [
+            "ai"
+          ],
+          "title": "Unguarded data flow from http_param to code_exec"
+        },
+        {
+          "backing_signal_count": 1,
+          "finding_ids": [],
+          "packages": [],
+          "priority_score": 422,
+          "remediation_key": null,
+          "rule_id": "RCH-RULE-7059753c",
+          "signal_families": [
+            "ai"
+          ],
+          "title": "Unguarded data flow from http_param to code_exec"
+        }
+      ]
+    }
+  ],
+  "created_at": "2026-06-04T18:50:22.852797+00:00",
+  "outcome": {
+    "message": "The `after-final` SARIF report contains no actionable findings.",
+    "status": "success"
+  },
+  "proof_scan": {
+    "by_level": {},
+    "exists": true,
+    "label": "after-final",
+    "path": ".reachable/ci-artifacts/reachable-after-final.sarif",
+    "results": 0,
+    "top_rules": []
+  },
+  "remediation_branch": "reachable-remediate-26972297438",
+  "remediation_mode": "codex-openai",
+  "remediation_run_id": "ci-remediate-20260604-184552-ed76af-codex-41a080948474",
+  "scans": [
+    {
+      "by_level": {
+        "error": 3,
+        "note": 13,
+        "warning": 7
+      },
+      "exists": true,
+      "label": "baseline",
+      "path": ".reachable/ci-artifacts/reachable.sarif",
+      "results": 23,
+      "top_rules": [
+        {
+          "count": 9,
+          "rule_id": "CWE/200"
+        },
+        {
+          "count": 3,
+          "rule_id": "AI/LLM05-unguarded-data-flow-from-http_param-to-c"
+        },
+        {
+          "count": 3,
+          "rule_id": "CWE/359"
+        },
+        {
+          "count": 1,
+          "rule_id": "CVE/CVE-2022-32149"
+        },
+        {
+          "count": 1,
+          "rule_id": "CVE/GO-2022-1059"
+        },
+        {
+          "count": 1,
+          "rule_id": "CWE/306"
+        },
+        {
+          "count": 1,
+          "rule_id": "CWE/319"
+        },
+        {
+          "count": 1,
+          "rule_id": "CWE/532"
+        },
+        {
+          "count": 1,
+          "rule_id": "CWE/78"
+        },
+        {
+          "count": 1,
+          "rule_id": "CWE/918"
+        },
+        {
+          "count": 1,
+          "rule_id": "SECRET/github-pat"
+        }
+      ]
+    },
+    {
+      "by_level": {},
+      "exists": true,
+      "label": "after-final",
+      "path": ".reachable/ci-artifacts/reachable-after-final.sarif",
+      "results": 0,
+      "top_rules": []
+    }
+  ],
+  "schema_version": 1,
+  "workflow": {
+    "actor": "al1dazzi",
+    "credential_presence": {
+      "anthropic_api_key": false,
+      "mcp_github_token": false,
+      "openai_api_key": true,
+      "reachable_api_key": false,
+      "reachable_github_token": false
+    },
+    "event_name": "workflow_dispatch",
+    "inputs": {
+      "agent": "codex",
+      "create_pr": "false",
+      "llm_provider": "openai",
+      "max_batches": "1",
+      "prompt_agent": "codex",
+      "prompt_profile": "balanced",
+      "remediate": "true",
+      "remediation_mode": "codex-openai",
+      "rescan_only": "false",
+      "rescan_strategy": "final",
+      "scan_extra_flags": "",
+      "signal_types": "all"
+    },
+    "job": "reachable-remediate",
+    "provider": "github_actions",
+    "ref": "refs/heads/main",
+    "repository": "sthenos-security/reach-testbed-go",
+    "run_attempt": "1",
+    "run_id": "26972297438",
+    "run_url": "https://github.com/sthenos-security/reach-testbed-go/actions/runs/26972297438",
+    "sha": "8abd78310ce1a9f20fa6468725b802d297175743",
+    "workflow": "Reachable Remediation Template",
+    "workflow_ref": "sthenos-security/reach-testbed-go/.github/workflows/reachable-remediate.yml@refs/heads/main"
+  }
+}

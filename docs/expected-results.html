@@ -246,9 +246,9 @@
       <div class="note">
         The full authoritative manifest is <code>../EXPECTED.md</code>. This page
         is the executive/demo view for non-security stakeholders. The exact
-        scanner/SARIF contract is machine-checked by
-        <code>expected/baseline.json</code> and
-        <code>ci/validate-expected-results.py</code>.
+        scanner contract is stored in <code>expected/baseline.json</code>; CI
+        checks the scan database against that contract before and after
+        remediation.
       </div>
     </section>
 
@@ -266,7 +266,7 @@
           <tr><td><code>remediate</code></td><td><code>false</code></td><td>Main kill switch. The default workflow scans and proves without changing code.</td></tr>
           <tr><td><code>remediation_mode</code></td><td><code>codex-openai</code></td><td>One-key CI mode. Use <code>OPENAI_API_KEY</code> for Codex or <code>ANTHROPIC_API_KEY</code> for Claude.</td></tr>
           <tr><td><code>max_batches</code></td><td><code>1</code></td><td>Prevents sending an unbounded backlog to one prompt.</td></tr>
-          <tr><td><code>proof_rescan</code></td><td><code>reachctl scan . --ci --sarif .reachable/ci-artifacts/reachable-after-final.sarif</code></td><td>Reachable proof command; the final SARIF must contain no actionable results after remediation.</td></tr>
+          <tr><td><code>proof_rescan</code></td><td>Enabled</td><td>Reachable performs a separate proof scan of the remediation branch. The final database must contain no production-actionable results.</td></tr>
           <tr><td><code>rescan_only</code></td><td><code>false</code></td><td>When true, verifies an existing remediation branch without invoking a coding agent or changing code.</td></tr>
           <tr><td><code>public_artifacts</code></td><td><code>SARIF + sanitized ledger</code></td><td>Raw prompt bundles, rules, skills, fuzz/pentest prompts, and agent transcripts are not uploaded.</td></tr>
         </tbody>

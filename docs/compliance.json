@@ -1,0 +1,687 @@
+{
+  "db_path": "<runner-local-path-withheld>/reach-testbed-go-d6485ada/repo.db",
+  "evidence": [
+    {
+      "audit": {
+        "control_id": "REV-SCAN-001",
+        "created_at": "2026-06-04 18:50:21",
+        "evidence_id": 53,
+        "framework": "reachable",
+        "locations": [],
+        "report_id": 2,
+        "scan_id": 4,
+        "severity": "high",
+        "signal_ids": [],
+        "source_row": 53,
+        "source_table": "compliance_evidence",
+        "source_tables": [
+          "scans",
+          "signals"
+        ],
+        "status": "pass"
+      },
+      "category": "scan_evidence",
+      "control_id": "REV-SCAN-001",
+      "created_at": "2026-06-04 18:50:21",
+      "evidence": {
+        "audit": {
+          "control_id": "REV-SCAN-001",
+          "created_at": "2026-06-04 18:50:21",
+          "evidence_id": 53,
+          "framework": "reachable",
+          "locations": [],
+          "report_id": 2,
+          "scan_id": 4,
+          "severity": "high",
+          "signal_ids": [],
+          "source_row": 53,
+          "source_table": "compliance_evidence",
+          "source_tables": [
+            "scans",
+            "signals"
+          ],
+          "status": "pass"
+        },
+        "counts": {
+          "actionable_production": 0,
+          "non_production": 7,
+          "not_reachable": 8,
+          "reachable_production": 0,
+          "remediation_units": 0,
+          "total_signals": 8,
+          "unknown_production": 0
+        },
+        "signal_type_counts": {
+          "CWE": 2,
+          "SECRET": 6
+        },
+        "source_tables": [
+          "scans",
+          "signals"
+        ]
+      },
+      "evidence_json": "{\"audit\": {\"locations\": [], \"report_id\": 2, \"scan_id\": 4, \"signal_ids\": [], \"source_tables\": [\"scans\", \"signals\"]}, \"counts\": {\"actionable_production\": 0, \"non_production\": 7, \"not_reachable\": 8, \"reachable_production\": 0, \"remediation_units\": 0, \"total_signals\": 8, \"unknown_production\": 0}, \"signal_type_counts\": {\"CWE\": 2, \"SECRET\": 6}, \"source_tables\": [\"scans\", \"signals\"]}",
+      "framework": "reachable",
+      "id": 53,
+      "report_id": 2,
+      "scan_id": 4,
+      "severity": "high",
+      "status": "pass",
+      "summary": "Scan produced 8 canonical signal rows in repo.db.",
+      "title": "Database-backed scan evidence"
+    },
+    {
+      "audit": {
+        "control_id": "REV-AI-BOM-001",
+        "created_at": "2026-06-04 18:50:21",
+        "evidence_id": 60,
+        "framework": "reachable",
+        "locations": [],
+        "report_id": 2,
+        "scan_id": 4,
+        "severity": "medium",
+        "signal_ids": [],
+        "source_row": 60,
+        "source_table": "compliance_evidence",
+        "source_tables": [
+          "ai_bom_entries",
+          "taint_flows",
+          "signals"
+        ],
+        "status": "pass"
+      },
+      "category": "ai_boundary_evidence",
+      "control_id": "REV-AI-BOM-001",
+      "created_at": "2026-06-04 18:50:21",
+      "evidence": {
+        "ai_boundary_counts": {
+          "agentic_output": 0,
+          "by_confidence": {},
+          "by_sink_type": {},
+          "by_source_type": {},
+          "llm_output": 0,
+          "samples": [],
+          "total": 0
+        },
+        "audit": {
+          "control_id": "REV-AI-BOM-001",
+          "created_at": "2026-06-04 18:50:21",
+          "evidence_id": 60,
+          "framework": "reachable",
+          "locations": [],
+          "report_id": 2,
+          "scan_id": 4,
+          "severity": "medium",
+          "signal_ids": [],
+          "source_row": 60,
+          "source_table": "compliance_evidence",
+          "source_tables": [
+            "ai_bom_entries",
+            "taint_flows",
+            "signals"
+          ],
+          "status": "pass"
+        },
+        "by_confidence": {},
+        "by_entry_type": {},
+        "by_sink_type": {},
+        "by_source_type": {},
+        "samples": [],
+        "source_tables": [
+          "ai_bom_entries",
+          "taint_flows",
+          "signals"
+        ],
+        "total": 0
+      },
+      "evidence_json": "{\"ai_boundary_counts\": {\"agentic_output\": 0, \"by_confidence\": {}, \"by_sink_type\": {}, \"by_source_type\": {}, \"llm_output\": 0, \"samples\": [], \"total\": 0}, \"audit\": {\"locations\": [], \"report_id\": 2, \"scan_id\": 4, \"signal_ids\": [], \"source_tables\": [\"ai_bom_entries\", \"taint_flows\", \"signals\"]}, \"by_confidence\": {}, \"by_entry_type\": {}, \"by_sink_type\": {}, \"by_source_type\": {}, \"samples\": [], \"source_tables\": [\"ai_bom_entries\", \"taint_flows\", \"signals\"], \"total\": 0}",
+      "framework": "reachable",
+      "id": 60,
+      "report_id": 2,
+      "scan_id": 4,
+      "severity": "medium",
+      "status": "pass",
+      "summary": "0 deterministic model/RAG/MCP/tool output flow(s) are materialized as AI-BOM entries for governance reporting.",
+      "title": "AI-BOM boundary inventory"
+    },
+    {
+      "audit": {
+        "control_id": "REV-FEEDBACK-001",
+        "created_at": "2026-06-04 18:50:21",
+        "evidence_id": 57,
+        "framework": "reachable",
+        "locations": [],
+        "report_id": 2,
+        "scan_id": 4,
+        "severity": "medium",
+        "signal_ids": [],
+        "source_row": 57,
+        "source_table": "compliance_evidence",
+        "source_tables": [
+          "finding_feedback"
+        ],
+        "status": "pass"
+      },
+      "category": "feedback_governance",
+      "control_id": "REV-FEEDBACK-001",
+      "created_at": "2026-06-04 18:50:21",
+      "evidence": {
+        "audit": {
+          "control_id": "REV-FEEDBACK-001",
+          "created_at": "2026-06-04 18:50:21",
+          "evidence_id": 57,
+          "framework": "reachable",
+          "locations": [],
+          "report_id": 2,
+          "scan_id": 4,
+          "severity": "medium",
+          "signal_ids": [],
+          "source_row": 57,
+          "source_table": "compliance_evidence",
+          "source_tables": [
+            "finding_feedback"
+          ],
+          "status": "pass"
+        },
+        "by_kind": {},
+        "by_recommended_action": {},
+        "by_status": {},
+        "needs_human_review": 0,
+        "policy_waiver": 0,
+        "source_tables": [
+          "finding_feedback"
+        ],
+        "total": 0
+      },
+      "evidence_json": "{\"audit\": {\"locations\": [], \"report_id\": 2, \"scan_id\": 4, \"signal_ids\": [], \"source_tables\": [\"finding_feedback\"]}, \"by_kind\": {}, \"by_recommended_action\": {}, \"by_status\": {}, \"needs_human_review\": 0, \"policy_waiver\": 0, \"source_tables\": [\"finding_feedback\"], \"total\": 0}",
+      "framework": "reachable",
+      "id": 57,
+      "report_id": 2,
+      "scan_id": 4,
+      "severity": "medium",
+      "status": "pass",
+      "summary": "0 feedback outcome(s) are tracked; 0 require human review and 0 are policy waivers.",
+      "title": "Agent and scanner feedback outcomes"
+    },
+    {
+      "audit": {
+        "control_id": "REV-PROD-001",
+        "created_at": "2026-06-04 18:50:21",
+        "evidence_id": 55,
+        "framework": "reachable",
+        "locations": [],
+        "report_id": 2,
+        "scan_id": 4,
+        "severity": "medium",
+        "signal_ids": [],
+        "source_row": 55,
+        "source_table": "compliance_evidence",
+        "source_tables": [
+          "signals"
+        ],
+        "status": "pass"
+      },
+      "category": "scope_control",
+      "control_id": "REV-PROD-001",
+      "created_at": "2026-06-04 18:50:21",
+      "evidence": {
+        "audit": {
+          "control_id": "REV-PROD-001",
+          "created_at": "2026-06-04 18:50:21",
+          "evidence_id": 55,
+          "framework": "reachable",
+          "locations": [],
+          "report_id": 2,
+          "scan_id": 4,
+          "severity": "medium",
+          "signal_ids": [],
+          "source_row": 55,
+          "source_table": "compliance_evidence",
+          "source_tables": [
+            "signals"
+          ],
+          "status": "pass"
+        },
+        "prod_status_counts": {
+          "NON_PROD": 7,
+          "UNKNOWN": 1
+        },
+        "source_tables": [
+          "signals"
+        ]
+      },
+      "evidence_json": "{\"audit\": {\"locations\": [], \"report_id\": 2, \"scan_id\": 4, \"signal_ids\": [], \"source_tables\": [\"signals\"]}, \"prod_status_counts\": {\"NON_PROD\": 7, \"UNKNOWN\": 1}, \"source_tables\": [\"signals\"]}",
+      "framework": "reachable",
+      "id": 55,
+      "report_id": 2,
+      "scan_id": 4,
+      "severity": "medium",
+      "status": "pass",
+      "summary": "7 signal(s) are marked non-production and excluded from actionable CI issue transport.",
+      "title": "Production and non-production separation"
+    },
+    {
+      "audit": {
+        "control_id": "REV-PROOF-001",
+        "created_at": "2026-06-04 18:50:21",
+        "evidence_id": 58,
+        "framework": "reachable",
+        "locations": [],
+        "report_id": 2,
+        "scan_id": 4,
+        "severity": "medium",
+        "signal_ids": [],
+        "source_row": 58,
+        "source_table": "compliance_evidence",
+        "source_tables": [
+          "agent_remediation_runs"
+        ],
+        "status": "pass"
+      },
+      "category": "proof_prompt_governance",
+      "control_id": "REV-PROOF-001",
+      "created_at": "2026-06-04 18:50:21",
+      "evidence": {
+        "attack_path": 0,
+        "audit": {
+          "control_id": "REV-PROOF-001",
+          "created_at": "2026-06-04 18:50:21",
+          "evidence_id": 58,
+          "framework": "reachable",
+          "locations": [],
+          "report_id": 2,
+          "scan_id": 4,
+          "severity": "medium",
+          "signal_ids": [],
+          "source_row": 58,
+          "source_table": "compliance_evidence",
+          "source_tables": [
+            "agent_remediation_runs"
+          ],
+          "status": "pass"
+        },
+        "by_family": {},
+        "by_mode": {},
+        "by_signal_type": {},
+        "mcp_rag": 0,
+        "mcp_rag_primitives": {},
+        "runs_with_proof_prompts": 0,
+        "source_tables": [
+          "agent_remediation_runs"
+        ],
+        "total": 0
+      },
+      "evidence_json": "{\"attack_path\": 0, \"audit\": {\"locations\": [], \"report_id\": 2, \"scan_id\": 4, \"signal_ids\": [], \"source_tables\": [\"agent_remediation_runs\"]}, \"by_family\": {}, \"by_mode\": {}, \"by_signal_type\": {}, \"mcp_rag\": 0, \"mcp_rag_primitives\": {}, \"runs_with_proof_prompts\": 0, \"source_tables\": [\"agent_remediation_runs\"], \"total\": 0}",
+      "framework": "reachable",
+      "id": 58,
+      "report_id": 2,
+      "scan_id": 4,
+      "severity": "medium",
+      "status": "pass",
+      "summary": "0 optional proof prompt(s) are tracked across remediation runs; 0 cover MCP/RAG or agentic runtime-supply-chain risk.",
+      "title": "Optional proof prompt coverage"
+    },
+    {
+      "audit": {
+        "control_id": "REV-PROOF-RUN-001",
+        "created_at": "2026-06-04 18:50:21",
+        "evidence_id": 59,
+        "framework": "reachable",
+        "locations": [],
+        "report_id": 2,
+        "scan_id": 4,
+        "severity": "medium",
+        "signal_ids": [],
+        "source_row": 59,
+        "source_table": "compliance_evidence",
+        "source_tables": [
+          "proof_profiles",
+          "proof_runs"
+        ],
+        "status": "pass"
+      },
+      "category": "proof_execution_governance",
+      "control_id": "REV-PROOF-RUN-001",
+      "created_at": "2026-06-04 18:50:21",
+      "evidence": {
+        "audit": {
+          "control_id": "REV-PROOF-RUN-001",
+          "created_at": "2026-06-04 18:50:21",
+          "evidence_id": 59,
+          "framework": "reachable",
+          "locations": [],
+          "report_id": 2,
+          "scan_id": 4,
+          "severity": "medium",
+          "signal_ids": [],
+          "source_row": 59,
+          "source_table": "compliance_evidence",
+          "source_tables": [
+            "proof_profiles",
+            "proof_runs"
+          ],
+          "status": "pass"
+        },
+        "by_phase": {},
+        "by_profile_kind": {},
+        "by_profile_status": {},
+        "by_state": {},
+        "defended_after_reattack": 0,
+        "failed": 0,
+        "needs_review": 0,
+        "samples": [],
+        "skipped_policy": 0,
+        "source_tables": [
+          "proof_profiles",
+          "proof_runs"
+        ],
+        "total_profiles": 0,
+        "total_runs": 0,
+        "verified_exploitable": 0
+      },
+      "evidence_json": "{\"audit\": {\"locations\": [], \"report_id\": 2, \"scan_id\": 4, \"signal_ids\": [], \"source_tables\": [\"proof_profiles\", \"proof_runs\"]}, \"by_phase\": {}, \"by_profile_kind\": {}, \"by_profile_status\": {}, \"by_state\": {}, \"defended_after_reattack\": 0, \"failed\": 0, \"needs_review\": 0, \"samples\": [], \"skipped_policy\": 0, \"source_tables\": [\"proof_profiles\", \"proof_runs\"], \"total_profiles\": 0, \"total_runs\": 0, \"verified_exploitable\": 0}",
+      "framework": "reachable",
+      "id": 59,
+      "report_id": 2,
+      "scan_id": 4,
+      "severity": "medium",
+      "status": "pass",
+      "summary": "0 proof run(s) are recorded across 0 profile(s); 0 verified exploitable and 0 defended after re-attack.",
+      "title": "Proof harness execution state"
+    },
+    {
+      "audit": {
+        "control_id": "REV-REACH-001",
+        "created_at": "2026-06-04 18:50:21",
+        "evidence_id": 54,
+        "framework": "reachable",
+        "locations": [],
+        "report_id": 2,
+        "scan_id": 4,
+        "severity": "medium",
+        "signal_ids": [],
+        "source_row": 54,
+        "source_table": "compliance_evidence",
+        "source_tables": [
+          "signals"
+        ],
+        "status": "pass"
+      },
+      "category": "risk_validation",
+      "control_id": "REV-REACH-001",
+      "created_at": "2026-06-04 18:50:21",
+      "evidence": {
+        "audit": {
+          "control_id": "REV-REACH-001",
+          "created_at": "2026-06-04 18:50:21",
+          "evidence_id": 54,
+          "framework": "reachable",
+          "locations": [],
+          "report_id": 2,
+          "scan_id": 4,
+          "severity": "medium",
+          "signal_ids": [],
+          "source_row": 54,
+          "source_table": "compliance_evidence",
+          "source_tables": [
+            "signals"
+          ],
+          "status": "pass"
+        },
+        "reachability_counts": {
+          "NOT_REACHABLE": 8
+        },
+        "risk_counts": {
+          "INFO": 7,
+          "LOW": 1
+        },
+        "source_tables": [
+          "signals"
+        ]
+      },
+      "evidence_json": "{\"audit\": {\"locations\": [], \"report_id\": 2, \"scan_id\": 4, \"signal_ids\": [], \"source_tables\": [\"signals\"]}, \"reachability_counts\": {\"NOT_REACHABLE\": 8}, \"risk_counts\": {\"INFO\": 7, \"LOW\": 1}, \"source_tables\": [\"signals\"]}",
+      "framework": "reachable",
+      "id": 54,
+      "report_id": 2,
+      "scan_id": 4,
+      "severity": "medium",
+      "status": "pass",
+      "summary": "0 production signal(s) remain reachable or unknown; 0 are reachable/exploitable.",
+      "title": "Reachability-filtered production risk"
+    },
+    {
+      "audit": {
+        "control_id": "REV-REMED-001",
+        "created_at": "2026-06-04 18:50:21",
+        "evidence_id": 56,
+        "framework": "reachable",
+        "locations": [],
+        "report_id": 2,
+        "scan_id": 4,
+        "severity": "medium",
+        "signal_ids": [],
+        "source_row": 56,
+        "source_table": "compliance_evidence",
+        "source_tables": [
+          "remediation_inventory"
+        ],
+        "status": "pass"
+      },
+      "category": "remediation_readiness",
+      "control_id": "REV-REMED-001",
+      "created_at": "2026-06-04 18:50:21",
+      "evidence": {
+        "audit": {
+          "control_id": "REV-REMED-001",
+          "created_at": "2026-06-04 18:50:21",
+          "evidence_id": 56,
+          "framework": "reachable",
+          "locations": [],
+          "report_id": 2,
+          "scan_id": 4,
+          "severity": "medium",
+          "signal_ids": [],
+          "source_row": 56,
+          "source_table": "compliance_evidence",
+          "source_tables": [
+            "remediation_inventory"
+          ],
+          "status": "pass"
+        },
+        "remediation_units": 0,
+        "source_tables": [
+          "remediation_inventory"
+        ]
+      },
+      "evidence_json": "{\"audit\": {\"locations\": [], \"report_id\": 2, \"scan_id\": 4, \"signal_ids\": [], \"source_tables\": [\"remediation_inventory\"]}, \"remediation_units\": 0, \"source_tables\": [\"remediation_inventory\"]}",
+      "framework": "reachable",
+      "id": 56,
+      "report_id": 2,
+      "scan_id": 4,
+      "severity": "medium",
+      "status": "pass",
+      "summary": "0 remediation unit(s) are materialized for agent prompt generation.",
+      "title": "Remediation inventory"
+    },
+    {
+      "audit": {
+        "control_id": "SLSA-Dependencies",
+        "created_at": "2026-06-04 18:50:21",
+        "evidence_id": 61,
+        "framework": "slsa",
+        "locations": [],
+        "report_id": 2,
+        "scan_id": 4,
+        "severity": "medium",
+        "signal_ids": [],
+        "source_row": 61,
+        "source_table": "compliance_evidence",
+        "source_tables": [
+          "signals"
+        ],
+        "status": "pass"
+      },
+      "category": "supply_chain",
+      "control_id": "SLSA-Dependencies",
+      "created_at": "2026-06-04 18:50:21",
+      "evidence": {
+        "audit": {
+          "control_id": "SLSA-Dependencies",
+          "created_at": "2026-06-04 18:50:21",
+          "evidence_id": 61,
+          "framework": "slsa",
+          "locations": [],
+          "report_id": 2,
+          "scan_id": 4,
+          "severity": "medium",
+          "signal_ids": [],
+          "source_row": 61,
+          "source_table": "compliance_evidence",
+          "source_tables": [
+            "signals"
+          ],
+          "status": "pass"
+        },
+        "signal_type_counts": {
+          "CWE": 2,
+          "SECRET": 6
+        },
+        "source_tables": [
+          "signals"
+        ]
+      },
+      "evidence_json": "{\"audit\": {\"locations\": [], \"report_id\": 2, \"scan_id\": 4, \"signal_ids\": [], \"source_tables\": [\"signals\"]}, \"signal_type_counts\": {\"CWE\": 2, \"SECRET\": 6}, \"source_tables\": [\"signals\"]}",
+      "framework": "slsa",
+      "id": 61,
+      "report_id": 2,
+      "scan_id": 4,
+      "severity": "medium",
+      "status": "pass",
+      "summary": "0 dependency/package risk signal(s) are present in the scan.",
+      "title": "Dependency and package risk evidence"
+    }
+  ],
+  "report": {
+    "created_at": "2026-06-04 18:50:21",
+    "fingerprint": "1a5fc732e4a391d2e9c0693838c379b8d860508dd554ad319c922c223b9df661",
+    "framework": "all",
+    "id": 2,
+    "report_type": "compliance_pack",
+    "scan_id": 4,
+    "schema_version": 4,
+    "status": "pass",
+    "summary_json": "{\"ai_bom_counts\": {\"by_confidence\": {}, \"by_entry_type\": {}, \"by_sink_type\": {}, \"by_source_type\": {}, \"samples\": [], \"total\": 0}, \"ai_boundary_counts\": {\"agentic_output\": 0, \"by_confidence\": {}, \"by_sink_type\": {}, \"by_source_type\": {}, \"llm_output\": 0, \"samples\": [], \"total\": 0}, \"counts\": {\"actionable_production\": 0, \"non_production\": 7, \"not_reachable\": 8, \"reachable_production\": 0, \"remediation_units\": 0, \"total_signals\": 8, \"unknown_production\": 0}, \"created_at\": \"2026-06-04T18:50:21.928003+00:00\", \"feedback_counts\": {\"by_kind\": {}, \"by_recommended_action\": {}, \"by_status\": {}, \"needs_human_review\": 0, \"policy_waiver\": 0, \"total\": 0}, \"fingerprint\": \"1a5fc732e4a391d2e9c0693838c379b8d860508dd554ad319c922c223b9df661\", \"framework\": \"all\", \"framework_label\": \"All frameworks\", \"governance_counts\": {\"by_pack\": {}, \"by_status\": {}, \"total\": 0}, \"overall_status\": \"pass\", \"prod_status_counts\": {\"NON_PROD\": 7, \"UNKNOWN\": 1}, \"proof_prompt_counts\": {\"attack_path\": 0, \"by_family\": {}, \"by_mode\": {}, \"by_signal_type\": {}, \"mcp_rag\": 0, \"mcp_rag_primitives\": {}, \"runs_with_proof_prompts\": 0, \"total\": 0}, \"proof_run_counts\": {\"by_phase\": {}, \"by_profile_kind\": {}, \"by_profile_status\": {}, \"by_state\": {}, \"defended_after_reattack\": 0, \"failed\": 0, \"needs_review\": 0, \"samples\": [], \"skipped_policy\": 0, \"total_profiles\": 0, \"total_runs\": 0, \"verified_exploitable\": 0}, \"reachability_counts\": {\"NOT_REACHABLE\": 8}, \"risk_counts\": {\"INFO\": 7, \"LOW\": 1}, \"scan\": {\"branch\": \"reachable-remediate-26972297438\", \"commit_hash\": \"8abd78310ce1a9f20fa6468725b802d297175743\", \"commit_short\": \"8abd7831\", \"config_count\": 0, \"critical_count\": 0, \"duration_seconds\": 5.03, \"high_count\": 0, \"id\": 4, \"low_count\": 0, \"medium_count\": 0, \"reachable_findings\": 0, \"risk_level\": \"NONE\", \"risk_score\": 0, \"scan_dir\": \"<runner-local-path-withheld>/reach-testbed-go-d6485ada/reachable-remediate-26972297438/20260604-185016-59ceb1\", \"source_files_scanned\": 28, \"status\": \"complete\", \"timestamp\": \"2026-06-04 18:50:16\", \"total_findings\": 8, \"unknown_count\": 0, \"version\": \"1.0.0b101\"}, \"schema_version\": 4, \"signal_type_counts\": {\"CWE\": 2, \"SECRET\": 6}, \"status_counts\": {\"pass\": 9}, \"top_findings\": []}"
+  },
+  "summary": {
+    "ai_bom_counts": {
+      "by_confidence": {},
+      "by_entry_type": {},
+      "by_sink_type": {},
+      "by_source_type": {},
+      "samples": [],
+      "total": 0
+    },
+    "ai_boundary_counts": {
+      "agentic_output": 0,
+      "by_confidence": {},
+      "by_sink_type": {},
+      "by_source_type": {},
+      "llm_output": 0,
+      "samples": [],
+      "total": 0
+    },
+    "counts": {
+      "actionable_production": 0,
+      "non_production": 7,
+      "not_reachable": 8,
+      "reachable_production": 0,
+      "remediation_units": 0,
+      "total_signals": 8,
+      "unknown_production": 0
+    },
+    "created_at": "2026-06-04T18:50:21.928003+00:00",
+    "feedback_counts": {
+      "by_kind": {},
+      "by_recommended_action": {},
+      "by_status": {},
+      "needs_human_review": 0,
+      "policy_waiver": 0,
+      "total": 0
+    },
+    "fingerprint": "1a5fc732e4a391d2e9c0693838c379b8d860508dd554ad319c922c223b9df661",
+    "framework": "all",
+    "framework_label": "All frameworks",
+    "governance_counts": {
+      "by_pack": {},
+      "by_status": {},
+      "total": 0
+    },
+    "overall_status": "pass",
+    "prod_status_counts": {
+      "NON_PROD": 7,
+      "UNKNOWN": 1
+    },
+    "proof_prompt_counts": {
+      "attack_path": 0,
+      "by_family": {},
+      "by_mode": {},
+      "by_signal_type": {},
+      "mcp_rag": 0,
+      "mcp_rag_primitives": {},
+      "runs_with_proof_prompts": 0,
+      "total": 0
+    },
+    "proof_run_counts": {
+      "by_phase": {},
+      "by_profile_kind": {},
+      "by_profile_status": {},
+      "by_state": {},
+      "defended_after_reattack": 0,
+      "failed": 0,
+      "needs_review": 0,
+      "samples": [],
+      "skipped_policy": 0,
+      "total_profiles": 0,
+      "total_runs": 0,
+      "verified_exploitable": 0
+    },
+    "reachability_counts": {
+      "NOT_REACHABLE": 8
+    },
+    "risk_counts": {
+      "INFO": 7,
+      "LOW": 1
+    },
+    "scan": {
+      "branch": "reachable-remediate-26972297438",
+      "commit_hash": "8abd78310ce1a9f20fa6468725b802d297175743",
+      "commit_short": "8abd7831",
+      "config_count": 0,
+      "critical_count": 0,
+      "duration_seconds": 5.03,
+      "high_count": 0,
+      "id": 4,
+      "low_count": 0,
+      "medium_count": 0,
+      "reachable_findings": 0,
+      "risk_level": "NONE",
+      "risk_score": 0,
+      "scan_dir": "<runner-local-path-withheld>/reach-testbed-go-d6485ada/reachable-remediate-26972297438/20260604-185016-59ceb1",
+      "source_files_scanned": 28,
+      "status": "complete",
+      "timestamp": "2026-06-04 18:50:16",
+      "total_findings": 8,
+      "unknown_count": 0,
+      "version": "1.0.0b101"
+    },
+    "schema_version": 4,
+    "signal_type_counts": {
+      "CWE": 2,
+      "SECRET": 6
+    },
+    "status_counts": {
+      "pass": 9
+    },
+    "top_findings": []
+  }
+}

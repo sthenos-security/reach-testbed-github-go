@@ -1,0 +1,62 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "REACHABLE",
+          "version": "1.0.0b101",
+          "semanticVersion": "1.0.0b101",
+          "informationUri": "https://reachable.dev",
+          "rules": [],
+          "properties": {
+            "reachabilityAnalysis": true,
+            "callGraphTracing": true,
+            "multiSignalCorrelation": true,
+            "findingTypes": [
+              "CVE",
+              "SECRET",
+              "CWE",
+              "MALWARE",
+              "SUSPICIOUS",
+              "AI",
+              "DLP"
+            ]
+          }
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "startTimeUtc": "2026-06-04T18:50:16Z",
+          "endTimeUtc": "2026-06-04T18:50:16Z"
+        }
+      ],
+      "results": [],
+      "properties": {
+        "reportingScope": "code-scanning",
+        "totalActionable": 0,
+        "totalProductionPosture": 0,
+        "totalEvidenceFindings": 0,
+        "byType": {},
+        "byReachability": {},
+        "byProdStatus": {},
+        "riskLevel": "NONE",
+        "languages": [
+          "config",
+          "go",
+          "python"
+        ],
+        "reachabilityNote": "This report contains production actionable EXPLOITABLE, REACHABLE, UNKNOWN, and DEFENDED/DEFENDABLE findings. NON_PROD and NOT_REACHABLE findings are omitted."
+      },
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "https://github.com/sthenos-security/reach-testbed-go",
+          "branch": "reachable-remediate-26972297438",
+          "revisionId": "8abd78310ce1a9f20fa6468725b802d297175743"
+        }
+      ]
+    }
+  ]
+}
