@@ -276,7 +276,7 @@
         </thead>
         <tbody>
           <tr><td><span class="pill blue">CVE</span></td><td>1</td><td>1</td><td>1</td><td>Reachable vulnerable Go dependency with a fixed version available.</td></tr>
-          <tr><td><span class="pill critical">CWE</span></td><td>12</td><td>9</td><td>12</td><td>Command injection, SSRF/network fetch, and error-disclosure patterns; defended rows stay visible as notes.</td></tr>
+          <tr><td><span class="pill critical">CWE</span></td><td>12</td><td>9</td><td>12</td><td>Command injection, SSRF/network fetch, and error-disclosure patterns; nonblocking evidence rows stay visible as notes.</td></tr>
           <tr><td><span class="pill medium">Secret</span></td><td>8</td><td>1</td><td>1</td><td>One synthetic token is production-actionable; fixture markers and workflow token names are filtered.</td></tr>
           <tr><td><span class="pill critical">DLP</span></td><td>2</td><td>2</td><td>2</td><td>Synthetic personal data is logged and sent to an outbound HTTP endpoint.</td></tr>
           <tr><td><span class="pill critical">AI</span></td><td>5</td><td>5</td><td>5</td><td>LLM calls and unguarded user-controlled flows are reachable.</td></tr>
@@ -290,8 +290,10 @@
         zero before the branch is ready to review and merge.
       </div>
       <div class="note">
-        Attack Prompt proof is expected to classify 12 attacked findings as
-        9 exploitable and 3 defended, with 0 errors and 0 skips.
+        The baseline contains 18 release-blocking findings before remediation.
+        A successful proof scan must reduce the DB-backed production-actionable
+        queue to zero. The remaining published rows are evidence/context rows,
+        not release blockers.
       </div>
     </section>
 
@@ -315,9 +317,9 @@
           <tr><td>GO-CWE-01</td><td>CWE / command injection</td><td>Critical, Reachable</td><td><code>internal/handlers/cwe.go</code></td><td>A request parameter is concatenated into a shell command. A caller could turn a diagnostic endpoint into command execution.</td><td>Remove shell string construction. Validate hostnames and pass arguments as an exec argument array or use a network library.</td></tr>
           <tr><td>GO-CWE-02</td><td>CWE / user-controlled URL fetch</td><td>Critical, Reachable</td><td><code>internal/handlers/suspicious.go</code></td><td>An admin route downloads from a caller-supplied URL. This models unsafe tool staging and SSRF-style fetch behavior.</td><td>Restrict sources to a trusted allowlist, require authentication, verify checksums/signatures, and avoid arbitrary outbound fetches.</td></tr>
           <tr><td>GO-CWE-03</td><td>CWE / SSRF HTTP client</td><td>Medium, Reachable</td><td><code>internal/handlers/suspicious.go</code></td><td>User input reaches an HTTP client, so server-side infrastructure could be asked to call untrusted destinations.</td><td>Use URL validation, deny private/internal ranges, enforce trusted schemes/hosts, and add timeouts.</td></tr>
-          <tr><td>GO-CWE-04</td><td>CWE / error disclosure</td><td>Medium, Reachable/defended mix</td><td><code>internal/handlers/cve.go</code></td><td>Parser errors are returned directly to clients, potentially exposing implementation details; Attack Prompt defends the non-attacker-controlled instances.</td><td>Return generic client errors and log details internally.</td></tr>
+          <tr><td>GO-CWE-04</td><td>CWE / error disclosure</td><td>Medium, Mixed blocking/nonblocking</td><td><code>internal/handlers/cve.go</code></td><td>Parser errors are returned directly to clients, potentially exposing implementation details; non-attacker-controlled instances are retained as nonblocking evidence.</td><td>Return generic client errors and log details internally.</td></tr>
           <tr><td>GO-CWE-05</td><td>CWE / error disclosure</td><td>Medium, Reachable</td><td><code>internal/handlers/ai.go</code></td><td>JSON decoding errors are returned directly from AI endpoints.</td><td>Return generic bad-request text and preserve details only in structured logs.</td></tr>
-          <tr><td>GO-CWE-06</td><td>CWE / error disclosure</td><td>Medium, Reachable/defended mix</td><td><code>internal/handlers/suspicious.go</code></td><td>Network, file, and copy errors from the tool-fetch path are exposed to callers; Attack Prompt defends one internal-only instance.</td><td>Return generic operational errors; keep internal details in logs or audit events.</td></tr>
+          <tr><td>GO-CWE-06</td><td>CWE / error disclosure</td><td>Medium, Mixed blocking/nonblocking</td><td><code>internal/handlers/suspicious.go</code></td><td>Network, file, and copy errors from the tool-fetch path are exposed to callers; one internal-only instance is retained as nonblocking evidence.</td><td>Return generic operational errors; keep internal details in logs or audit events.</td></tr>
           <tr><td>GO-SECRET-01</td><td>Secret / GitHub token shape</td><td>Medium, Reachable</td><td><code>internal/handlers/secrets.go</code></td><td>A synthetic GitHub-shaped token is embedded in code and returned by an API. In a real system this would be a credential leak.</td><td>Rotate the value, remove it from code, load it from a secret manager, and never return it in responses.</td></tr>
           <tr><td>GO-SECRET-02</td><td>Secret / AWS access key shape</td><td>Info, Not reachable</td><td><code>internal/handlers/secrets.go</code></td><td>An AWS-shaped synthetic marker is present for detector coverage but is filtered as non-actionable in the latest proof.</td><td>Keep only synthetic test markers in fixtures; never put real cloud credentials in source.</td></tr>
           <tr><td>GO-SECRET-03</td><td>Secret / workflow token variables</td><td>Info, Not reachable / non-production</td><td><code>.github/workflows/reachable-remediate.yml</code></td><td><code>GITHUB_TOKEN</code> and <code>GH_TOKEN</code> are environment variable names used by GitHub tooling, not real secret values.</td><td>No code fix required. They should remain filtered/non-actionable.</td></tr>

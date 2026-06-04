@@ -18,21 +18,21 @@ CI validates the baseline database against that contract before remediation.
 | Raw DB signals | 28 |
 | Action Required before remediation | 18 |
 | Published DB demo rows | 21 |
-| Attack Prompt findings | 12 |
-| Attack Prompt exploitable | 9 |
-| Attack Prompt defended | 3 |
-| Attack Prompt errors | 0 |
-| Attack Prompt skipped | 0 |
+| Grouped expected findings | 17 |
+| Release-blocking findings before remediation | 18 |
+| Nonblocking evidence rows before remediation | 3 |
+| Required proof result after remediation | 0 production-actionable findings |
 
 Expected signal count:
 
 | Family | DB total | Action Required | Published DB demo rows | Expected notes |
 |--------|---------:|----------------:|--------------------:|----------------|
 | CVE | 1 | 1 | 1 | Reachable vulnerable Go dependency. |
-| CWE | 12 | 9 | 12 | Command injection, SSRF/network fetch, and error disclosure patterns; three rows are defended by Attack Prompt and remain visible as notes. |
+| CWE | 12 | 9 | 12 | Command injection, SSRF/network fetch, and error disclosure patterns; nonblocking evidence rows remain visible as notes. |
 | Secret | 8 | 1 | 1 | One production/unknown synthetic GitHub-shaped token is actionable; workflow token names and unreachable markers are filtered. |
 | DLP | 2 | 2 | 2 | Synthetic personal data logged and sent over HTTP. |
 | AI | 5 | 5 | 5 | LLM calls and unguarded user-controlled flows. |
+| **Total** | **28** | **18** | **21** | Baseline DB contract totals. |
 
 ## Remediation Proof
 
@@ -58,9 +58,9 @@ only on the database comparison.
 | GO-CWE-01 | CWE / command injection | Critical | Reachable | `internal/handlers/cwe.go` | A request parameter is concatenated into a shell command. A caller could turn a diagnostic endpoint into command execution. | Remove shell string construction. Validate hostnames and pass arguments as an exec argument array or use a network library. |
 | GO-CWE-02 | CWE / user-controlled URL fetch | Critical | Reachable | `internal/handlers/suspicious.go` | An admin route downloads from a caller-supplied URL. This models unsafe tool staging and SSRF-style fetch behavior. | Restrict sources to a trusted allowlist, require authentication, verify checksums/signatures, and avoid arbitrary outbound fetches. |
 | GO-CWE-03 | CWE / SSRF HTTP client | Medium | Reachable | `internal/handlers/suspicious.go` | User input reaches an HTTP client, so server-side infrastructure could be asked to call untrusted destinations. | Use URL validation, deny private/internal ranges, enforce trusted schemes/hosts, and add timeouts. |
-| GO-CWE-04 | CWE / error disclosure | Medium | Reachable/defended mix | `internal/handlers/cve.go` | Parser errors are returned directly to clients, potentially exposing implementation details; Attack Prompt defends the non-attacker-controlled instances. | Return generic client errors and log details internally. |
+| GO-CWE-04 | CWE / error disclosure | Medium | Mixed blocking/nonblocking | `internal/handlers/cve.go` | Parser errors are returned directly to clients, potentially exposing implementation details; non-attacker-controlled instances are retained as nonblocking evidence. | Return generic client errors and log details internally. |
 | GO-CWE-05 | CWE / error disclosure | Medium | Reachable | `internal/handlers/ai.go` | JSON decoding errors are returned directly from AI endpoints. | Return generic bad-request text and preserve details only in structured logs. |
-| GO-CWE-06 | CWE / error disclosure | Medium | Reachable/defended mix | `internal/handlers/suspicious.go` | Network, file, and copy errors from the tool-fetch path are exposed to callers; Attack Prompt defends one internal-only instance. | Return generic operational errors; keep internal details in logs or audit events. |
+| GO-CWE-06 | CWE / error disclosure | Medium | Mixed blocking/nonblocking | `internal/handlers/suspicious.go` | Network, file, and copy errors from the tool-fetch path are exposed to callers; one internal-only instance is retained as nonblocking evidence. | Return generic operational errors; keep internal details in logs or audit events. |
 | GO-SECRET-01 | Secret / GitHub token shape | Medium | Reachable | `internal/handlers/secrets.go` | A synthetic GitHub-shaped token is embedded in code and returned by an API. In a real system this would be a credential leak. | Rotate the value, remove it from code, load it from a secret manager, and never return it in responses. |
 | GO-SECRET-02 | Secret / AWS access key shape | Info | Not reachable | `internal/handlers/secrets.go` | An AWS-shaped synthetic marker is present for detector coverage but is filtered as non-actionable in the latest proof. | Keep only synthetic test markers in fixtures; never put real cloud credentials in source. |
 | GO-SECRET-03 | Secret / workflow token variables | Info | Not reachable / non-production | `.github/workflows/reachable-remediate.yml` | `GITHUB_TOKEN` and `GH_TOKEN` are environment variable names used by GitHub tooling, not real secret values. | No code fix required. They should remain filtered/non-actionable. |

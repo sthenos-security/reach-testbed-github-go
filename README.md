@@ -80,7 +80,7 @@ Current golden baseline:
 | Action Required before remediation | 18 |
 | Published DB demo rows | 21 |
 | Families | CVE, CWE, secret, DLP, AI |
-| Attack Prompt verdicts | 9 exploitable, 3 defended, 0 errors |
+| Grouped expected findings | 17 grouped findings covering 21 published DB demo rows. |
 | Actionable after remediation | 0 |
 | Residual post-fix findings | Only filtered `NON_PROD` or `NOT_REACHABLE` fixture markers may remain in the database. |
 
