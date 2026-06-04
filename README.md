@@ -51,11 +51,18 @@ Current golden baseline:
 
 | Result | Expected |
 |--------|----------|
-| Raw signals | 25 |
-| Actionable before remediation | 22 |
+| Raw DB signals | 28 |
+| Action Required before remediation | 18 |
+| Public SARIF posture rows | 21 |
 | Families | CVE, CWE, secret, DLP, AI |
 | Actionable after remediation | 0 |
-| Residual post-fix findings | Filtered `NOT_REACHABLE` synthetic secret markers only |
+| Residual post-fix findings | No production-actionable SARIF rows; filtered `NON_PROD` or `NOT_REACHABLE` fixture markers may remain in the DB. |
+
+The baseline is machine-checked by
+[expected/baseline.json](expected/baseline.json) and
+[ci/validate-expected-results.py](ci/validate-expected-results.py). The
+validator compares the scan database and SARIF export so the demo can assert a
+100% expected-result match instead of relying on screenshots.
 
 ## Layout
 
@@ -158,6 +165,40 @@ Important manual inputs:
 | `scan_extra_flags` | Extra `reachctl scan` flags. |
 | `require_ai` | Fail early unless a Reachable scan/enrichment key is configured. Keep `true` for demos. |
 | `create_pr` | Open a PR after successful remediation. |
+
+### Verification Logic
+
+The remediation run always performs an automatic proof scan after the coding
+agent edits the `reachable-remediate-*` branch. That final scan runs
+`reachctl scan` only; it does not invoke remediation again. The proof gate
+passes only when the final SARIF contains zero production-actionable rows.
+
+Use `rescan_only=true` to manually verify an existing remediation branch later,
+for example after review comments or an extra pushed fix. In that mode the
+workflow checks out `target_branch`, runs the scan/audit/integrity steps, and
+fails the run if the verification SARIF still contains findings. It never
+creates a branch, invokes a coding agent, or edits code.
+
+The GitHub Pages mini-dashboard includes a **Verified** section showing the
+proof mode, proof scan label, remaining SARIF result count, and ledger status.
+
+### Optional Human-Approved Auto-Merge
+
+Organizations can automate the last mile without letting the agent merge code
+unilaterally:
+
+1. Reachable opens the remediation PR.
+2. Branch protection requires the proof scan, audit, integrity check, tests,
+   SARIF upload, and Pages summary to pass.
+3. A GitHub App or workflow posts a Slack/email approval request to an allowed
+   team with the compare link, proof status, and public mini-dashboard link.
+4. An authenticated approver clicks approve. The app verifies org/team
+   membership and records the approval event.
+5. The app enables GitHub auto-merge or sends the PR to the merge queue.
+
+Do not accept merge approvals from public PR comments. Approval has to be
+identity-checked against the customer org, CODEOWNERS, or an explicit
+allowlisted reviewer team.
 
 ### Reset Demo Branches
 

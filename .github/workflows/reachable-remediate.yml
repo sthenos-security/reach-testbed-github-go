@@ -604,6 +604,25 @@ jobs:
 
           printf '%s\n' "$pr_output"
 
+      - name: Remove private remediation bundle
+        if: always()
+        run: |
+          # The remediation bundle contains proprietary prompt/rule material.
+          # It is only for the in-run agent handoff; Pages and public artifacts
+          # must contain the sanitized ledger/report data, never prompt.md,
+          # bundle.json, rules.json, or private agent transcripts.
+          reachctl remediate --workspace . --cleanup
+          if find .reachable/ci-artifacts \
+              \( -name prompt.md -o -name bundle.json -o -name rules.json -o -path '*/ai-rules/*' \) \
+              -print -quit | grep -q .; then
+            echo "ERROR: private remediation bundle material was found in public CI artifacts." >&2
+            find .reachable/ci-artifacts \
+              \( -name prompt.md -o -name bundle.json -o -name rules.json -o -path '*/ai-rules/*' \) \
+              -print >&2
+            exit 3
+          fi
+          echo "Private remediation bundle removed; only sanitized CI artifacts remain."
+
       - name: Select SARIF for GitHub code scanning
         if: always()
         run: |
@@ -627,7 +646,7 @@ jobs:
           fi
 
       - name: Build public Reachable Pages summary
-        if: always()
+        if: always() && inputs.remediate && !inputs.rescan_only
         run: |
           python ci/build-pages-summary.py \
             --sarif .reachable/ci-artifacts/reachable-code-scanning.sarif \
@@ -708,12 +727,12 @@ jobs:
             .reachable/ci-artifacts/**
 
       - name: Configure GitHub Pages
-        if: always() && github.event_name != 'pull_request'
+        if: always() && github.event_name != 'pull_request' && inputs.remediate && !inputs.rescan_only
         continue-on-error: true
         uses: actions/configure-pages@v5
 
       - name: Upload GitHub Pages artifact
-        if: always() && github.event_name != 'pull_request'
+        if: always() && github.event_name != 'pull_request' && inputs.remediate && !inputs.rescan_only
         continue-on-error: true
         uses: actions/upload-pages-artifact@v3
         with:
@@ -721,7 +740,7 @@ jobs:
 
       - name: Deploy GitHub Pages
         id: deployment
-        if: always() && github.event_name != 'pull_request'
+        if: always() && github.event_name != 'pull_request' && inputs.remediate && !inputs.rescan_only
         continue-on-error: true
         uses: actions/deploy-pages@v4
 

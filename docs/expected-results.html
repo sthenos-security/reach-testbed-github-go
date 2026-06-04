@@ -172,19 +172,19 @@
 
     <div class="grid">
       <div class="card">
-        <div class="eyebrow">Baseline Signals</div>
-        <div class="metric">25</div>
-        <p>Expected raw signal count on `main`.</p>
+        <div class="eyebrow">DB Signals</div>
+        <div class="metric">28</div>
+        <p>Expected raw scanner truth on `main`.</p>
       </div>
       <div class="card">
-        <div class="eyebrow">Actionable</div>
-        <div class="metric">22</div>
-        <p>Expected before remediation.</p>
+        <div class="eyebrow">Action Required</div>
+        <div class="metric">18</div>
+        <p>Terminal issue queue before remediation.</p>
       </div>
       <div class="card">
-        <div class="eyebrow">Families</div>
-        <div class="metric">5</div>
-        <p>CVE, CWE, secret, DLP, and AI.</p>
+        <div class="eyebrow">SARIF Posture</div>
+        <div class="metric">21</div>
+        <p>Public CI rows, including defended notes.</p>
       </div>
       <div class="card">
         <div class="eyebrow">Proof Target</div>
@@ -199,19 +199,24 @@
         <thead>
           <tr>
             <th>Family</th>
-            <th>Total</th>
-            <th>Actionable</th>
+            <th>DB total</th>
+            <th>Action Required</th>
+            <th>SARIF posture</th>
             <th>Expected behavior</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td><span class="pill blue">CVE</span></td><td>1</td><td>1</td><td>Reachable vulnerable Go dependency with a fixed version available.</td></tr>
-          <tr><td><span class="pill critical">CWE</span></td><td>12</td><td>12</td><td>Command injection, SSRF/network fetch, and error-disclosure patterns.</td></tr>
-          <tr><td><span class="pill medium">Secret</span></td><td>5</td><td>2</td><td>Two reachable synthetic tokens plus three filtered/non-actionable markers.</td></tr>
-          <tr><td><span class="pill critical">DLP</span></td><td>2</td><td>2</td><td>Synthetic personal data is logged and sent to an outbound HTTP endpoint.</td></tr>
-          <tr><td><span class="pill critical">AI</span></td><td>5</td><td>5</td><td>LLM calls and unguarded user-controlled flows are reachable.</td></tr>
+          <tr><td><span class="pill blue">CVE</span></td><td>1</td><td>1</td><td>1</td><td>Reachable vulnerable Go dependency with a fixed version available.</td></tr>
+          <tr><td><span class="pill critical">CWE</span></td><td>12</td><td>9</td><td>12</td><td>Command injection, SSRF/network fetch, and error-disclosure patterns; defended rows stay visible as notes.</td></tr>
+          <tr><td><span class="pill medium">Secret</span></td><td>8</td><td>1</td><td>1</td><td>One synthetic token is production-actionable; fixture markers and workflow token names are filtered.</td></tr>
+          <tr><td><span class="pill critical">DLP</span></td><td>2</td><td>2</td><td>2</td><td>Synthetic personal data is logged and sent to an outbound HTTP endpoint.</td></tr>
+          <tr><td><span class="pill critical">AI</span></td><td>5</td><td>5</td><td>5</td><td>LLM calls and unguarded user-controlled flows are reachable.</td></tr>
         </tbody>
       </table>
+      <div class="note">
+        Attack Prompt proof is expected to classify 12 attacked findings as
+        9 exploitable and 3 defended, with 0 errors and 0 skips.
+      </div>
     </section>
 
     <section>
@@ -240,7 +245,10 @@
       </table>
       <div class="note">
         The full authoritative manifest is <code>../EXPECTED.md</code>. This page
-        is the executive/demo view for non-security stakeholders.
+        is the executive/demo view for non-security stakeholders. The exact
+        scanner/SARIF contract is machine-checked by
+        <code>expected/baseline.json</code> and
+        <code>ci/validate-expected-results.py</code>.
       </div>
     </section>
 
@@ -259,6 +267,7 @@
           <tr><td><code>remediation_mode</code></td><td><code>codex-openai</code></td><td>One-key CI mode. Use <code>OPENAI_API_KEY</code> for Codex or <code>ANTHROPIC_API_KEY</code> for Claude.</td></tr>
           <tr><td><code>max_batches</code></td><td><code>1</code></td><td>Prevents sending an unbounded backlog to one prompt.</td></tr>
           <tr><td><code>proof_rescan</code></td><td><code>reachctl scan . --ci --sarif .reachable/ci-artifacts/reachable-after-final.sarif</code></td><td>Reachable proof command; the final SARIF must contain no actionable results after remediation.</td></tr>
+          <tr><td><code>rescan_only</code></td><td><code>false</code></td><td>When true, verifies an existing remediation branch without invoking a coding agent or changing code.</td></tr>
           <tr><td><code>public_artifacts</code></td><td><code>SARIF + sanitized ledger</code></td><td>Raw prompt bundles, rules, skills, fuzz/pentest prompts, and agent transcripts are not uploaded.</td></tr>
         </tbody>
       </table>

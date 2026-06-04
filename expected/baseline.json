@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "name": "reach-testbed-go golden baseline",
+  "verified_with_reachable": "1.0.0b97",
+  "verified_scan_session": "20260603-082131-beef72",
+  "notes": [
+    "All secrets and PII are synthetic.",
+    "DB signals are scanner truth, including filtered rows.",
+    "SARIF posture rows are public CI/demo truth and include defended rows.",
+    "EXPLOITABLE rows must come from Attack Prompt / Enzo attacker evidence."
+  ],
+  "db": {
+    "total_signals": 28,
+    "by_type": {
+      "ai": 5,
+      "cve": 1,
+      "cwe": 12,
+      "dlp": 2,
+      "secret": 8
+    },
+    "by_reachability": {
+      "NOT_REACHABLE": 7,
+      "REACHABLE": 21
+    },
+    "by_prod_status": {
+      "NON_PROD": 5,
+      "PRODUCTION": 20,
+      "UNKNOWN": 3
+    },
+    "by_risk": {
+      "CRITICAL": 6,
+      "HIGH": 1,
+      "INFO": 7,
+      "MEDIUM": 14
+    },
+    "action_required": {
+      "total": 18,
+      "by_type": {
+        "ai": 5,
+        "cve": 1,
+        "cwe": 9,
+        "dlp": 2,
+        "secret": 1
+      }
+    },
+    "attacker": {
+      "tasks": 12,
+      "exploitable": 9,
+      "defended": 3,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "sarif": {
+    "total_results": 21,
+    "total_actionable": 17,
+    "total_production_posture": 21,
+    "by_level": {
+      "error": 7,
+      "note": 3,
+      "warning": 11
+    },
+    "by_type": {
+      "AI": 5,
+      "CVE": 1,
+      "CWE": 12,
+      "DLP": 2,
+      "SECRET": 1
+    },
+    "by_reachability": {
+      "defended": 3,
+      "exploitable": 9,
+      "reachable": 9
+    },
+    "by_prod_status": {
+      "PRODUCTION": 20,
+      "UNKNOWN": 1
+    },
+    "results": [
+      ["AI/LLM01-http-post-with-pii-payload-\u2014-data-leakag", "reachable", "CRITICAL", "PRODUCTION", "internal/handlers/ai.go", 32],
+      ["AI/LLM01-http-post-with-pii-payload-\u2014-data-leakag", "reachable", "CRITICAL", "PRODUCTION", "internal/handlers/ai.go", 51],
+      ["CWE/78", "exploitable", "CRITICAL", "PRODUCTION", "internal/handlers/cwe.go", 12],
+      ["CWE/319", "exploitable", "CRITICAL", "PRODUCTION", "internal/handlers/suspicious.go", 13],
+      ["DLP/6fd2031f2cff0e06", "reachable", "CRITICAL", "PRODUCTION", "internal/handlers/dlp.go", 13],
+      ["DLP/f22dde2c0a9e3739", "reachable", "CRITICAL", "PRODUCTION", "internal/handlers/dlp.go", 15],
+      ["CVE/CVE-2022-32149", "reachable", "HIGH", "PRODUCTION", "internal/handlers/cve.go", 0],
+      ["AI/LLM05-unguarded-data-flow-from-http_param-to-c", "reachable", "MEDIUM", "PRODUCTION", "internal/handlers/cwe.go", 11],
+      ["AI/LLM05-unguarded-data-flow-from-http_param-to-c", "reachable", "MEDIUM", "PRODUCTION", "internal/handlers/suspicious.go", 13],
+      ["AI/LLM05-unguarded-data-flow-from-http_param-to-c", "reachable", "MEDIUM", "PRODUCTION", "internal/handlers/cwe.go", 22],
+      ["CWE/200", "defended", "MEDIUM", "PRODUCTION", "internal/handlers/cve.go", 38],
+      ["CWE/200", "exploitable", "MEDIUM", "PRODUCTION", "internal/handlers/cve.go", 22],
+      ["CWE/200", "exploitable", "MEDIUM", "PRODUCTION", "internal/handlers/ai.go", 21],
+      ["CWE/200", "defended", "MEDIUM", "PRODUCTION", "internal/handlers/cve.go", 16],
+      ["CWE/918", "exploitable", "MEDIUM", "PRODUCTION", "internal/handlers/suspicious.go", 14],
+      ["CWE/200", "exploitable", "MEDIUM", "PRODUCTION", "internal/handlers/suspicious.go", 16],
+      ["CWE/200", "exploitable", "MEDIUM", "PRODUCTION", "internal/handlers/ai.go", 39],
+      ["CWE/200", "defended", "MEDIUM", "PRODUCTION", "internal/handlers/suspicious.go", 24],
+      ["CWE/200", "exploitable", "MEDIUM", "PRODUCTION", "internal/handlers/ai.go", 61],
+      ["CWE/200", "exploitable", "MEDIUM", "PRODUCTION", "internal/handlers/suspicious.go", 30],
+      ["SECRET/github-pat", "reachable", "MEDIUM", "UNKNOWN", "internal/handlers/secrets.go", 11]
+    ]
+  }
+}

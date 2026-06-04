@@ -227,7 +227,18 @@ def main() -> int:
         )
 
     proof_scan = scans[-1] if scans else {"label": "none", "results": 0}
-    if not attempts:
+    rescan_only = str(os.environ.get("REACHABLE_RESCAN_ONLY") or "").lower() == "true"
+    if rescan_only:
+        if int(proof_scan.get("results") or 0) == 0:
+            status = "verified"
+            message = f"The `{proof_scan.get('label')}` verification SARIF report contains no actionable findings."
+        else:
+            status = "verification_failed"
+            message = (
+                f"The `{proof_scan.get('label')}` verification SARIF report still contains actionable findings. "
+                "Run another remediation batch or send the branch for human review."
+            )
+    elif not attempts:
         status = "scan_only"
         message = "No remediation was attempted. Review baseline SARIF for current actionable findings."
     elif int(proof_scan.get("results") or 0) == 0:
@@ -274,8 +285,14 @@ def main() -> int:
                 artifact_dir=artifact_dir,
             )
             report = load_agent_remediation_report(db_path=db_path, run_id=run_id)
-            json_path.write_text(render_agent_remediation_json(report), encoding="utf-8")
-            md_path.write_text(render_agent_remediation_markdown(report), encoding="utf-8")
+            (artifact_dir / "remediation-ledger-db.json").write_text(
+                render_agent_remediation_json(report),
+                encoding="utf-8",
+            )
+            (artifact_dir / "remediation-ledger-db.md").write_text(
+                render_agent_remediation_markdown(report),
+                encoding="utf-8",
+            )
             materialize_agent_remediation_ledger(
                 db_path=db_path,
                 ledger={**ledger, "remediation_run_id": run_id},
@@ -284,6 +301,8 @@ def main() -> int:
             )
             db_persisted = True
             ledger["remediation_run_id"] = run_id
+            json_path.write_text(json.dumps(ledger, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            _write_markdown(md_path, ledger)
         except Exception as exc:  # pragma: no cover - CI compatibility fallback
             db_error = str(exc)
             print(f"::warning::Reachable remediation DB ledger persistence failed: {exc}", file=sys.stderr)

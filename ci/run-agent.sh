@@ -56,8 +56,7 @@ case "$AGENT" in
       exit 127
     }
     codex exec \
-      -s danger-full-access \
-      --ask-for-approval never \
+      --dangerously-bypass-approvals-and-sandbox \
       -C "$PWD" \
       --skip-git-repo-check \
       --ephemeral \

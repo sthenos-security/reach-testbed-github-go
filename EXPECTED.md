@@ -15,19 +15,34 @@ Latest verified baseline:
 ```text
 repo:    /Users/alaindazzi/src/reach-testbed-go
 branch:  main
-scan:    /Users/alaindazzi/.reachable/scans/reach-testbed-go-64462931/main/20260529-081617-9b16e1
-result:  25 signals, 22 actionable
+scan:    /Users/alaindazzi/.reachable/scans/reach-testbed-go-64462931/main/20260603-082131-beef72
+result:  28 DB signals, 18 terminal Action Required, 21 public SARIF posture rows
 ```
+
+The exact machine-readable baseline is `expected/baseline.json`; validate a
+fresh scan with `ci/validate-expected-results.py`. The table below separates
+scanner truth from public CI posture so the demo does not conflate raw findings,
+triaged action, and SARIF export rows.
 
 Expected signal count:
 
-| Family | Expected total | Expected actionable | Expected notes |
-|--------|----------------|--------------------|----------------|
-| CVE | 1 | 1 | Reachable vulnerable Go dependency. |
-| CWE | 12 | 12 | Command injection, SSRF/network fetch, and error disclosure patterns. |
-| Secret | 5 | 2 | Two reachable synthetic tokens plus three intentionally filtered/non-actionable markers. |
-| DLP | 2 | 2 | Synthetic personal data logged and sent over HTTP. |
-| AI | 5 | 5 | LLM calls and unguarded user-controlled flows. |
+| Family | DB total | Action Required | Public SARIF posture | Expected notes |
+|--------|---------:|----------------:|---------------------:|----------------|
+| CVE | 1 | 1 | 1 | Reachable vulnerable Go dependency. |
+| CWE | 12 | 9 | 12 | Command injection, SSRF/network fetch, and error disclosure patterns; 3 rows are defended by Attack Prompt and remain visible as notes. |
+| Secret | 8 | 1 | 1 | One production/unknown synthetic GitHub-shaped token is actionable; workflow token names and unreachable markers are filtered. |
+| DLP | 2 | 2 | 2 | Synthetic personal data logged and sent over HTTP. |
+| AI | 5 | 5 | 5 | LLM calls and unguarded user-controlled flows. |
+
+Expected Attack Prompt proof:
+
+| Metric | Expected |
+|--------|---------:|
+| Attacked findings | 12 |
+| Exploitable | 9 |
+| Defended | 3 |
+| Errors | 0 |
+| Skipped | 0 |
 
 Expected remediation proof:
 
@@ -35,7 +50,8 @@ Expected remediation proof:
 |--------------|------------------|
 | `reachctl scan . --ci --sarif .reachable/ci-artifacts/reachable-after-final.sarif` | Final proof scan returns no actionable SARIF results after remediation. |
 | Post-remediation scan | `ACTION REQUIRED 0`. |
-| Residual findings | At most filtered `NOT_REACHABLE` synthetic secret markers. |
+| Post-remediation SARIF | Zero production-actionable rows. |
+| Residual findings | At most filtered `NON_PROD` or `NOT_REACHABLE` fixture markers in the DB. |
 | `reachctl audit --latest --summary` | Passes data-quality checks. |
 | `reachctl integrity --latest` | Passes dashboard/database integrity checks. |
 
@@ -47,13 +63,12 @@ Expected remediation proof:
 | GO-CWE-01 | CWE / command injection | Critical | Reachable | `internal/handlers/cwe.go` | A request parameter is concatenated into a shell command. A caller could turn a diagnostic endpoint into command execution. | Remove shell string construction. Validate hostnames and pass arguments as an exec argument array or use a network library. |
 | GO-CWE-02 | CWE / user-controlled URL fetch | Critical | Reachable | `internal/handlers/suspicious.go` | An admin route downloads from a caller-supplied URL. This models unsafe tool staging and SSRF-style fetch behavior. | Restrict sources to a trusted allowlist, require authentication, verify checksums/signatures, and avoid arbitrary outbound fetches. |
 | GO-CWE-03 | CWE / SSRF HTTP client | Medium | Reachable | `internal/handlers/suspicious.go` | User input reaches `http.Get`, so server-side infrastructure could be asked to call untrusted destinations. | Use URL validation, deny private/internal ranges, enforce trusted schemes/hosts, and add timeouts. |
-| GO-CWE-04 | CWE / error disclosure | Medium | Reachable | `internal/handlers/cve.go` | Parser errors are returned directly to clients, potentially exposing implementation details. | Return generic client errors and log details internally. |
+| GO-CWE-04 | CWE / error disclosure | Medium | Reachable/defended mix | `internal/handlers/cve.go` | Parser errors are returned directly to clients, potentially exposing implementation details; Attack Prompt defends the non-attacker-controlled instances. | Return generic client errors and log details internally. |
 | GO-CWE-05 | CWE / error disclosure | Medium | Reachable | `internal/handlers/ai.go` | JSON decoding errors are returned directly from AI endpoints. | Return generic bad-request text and preserve details only in structured logs. |
-| GO-CWE-06 | CWE / error disclosure | Medium | Reachable | `internal/handlers/suspicious.go` | Network, file, and copy errors from the tool-fetch path are exposed to callers. | Return generic operational errors; keep internal details in logs or audit events. |
+| GO-CWE-06 | CWE / error disclosure | Medium | Reachable/defended mix | `internal/handlers/suspicious.go` | Network, file, and copy errors from the tool-fetch path are exposed to callers; Attack Prompt defends one internal-only instance. | Return generic operational errors; keep internal details in logs or audit events. |
 | GO-SECRET-01 | Secret / GitHub token shape | Medium | Reachable | `internal/handlers/secrets.go` | A synthetic GitHub-shaped token is embedded in code and returned by an API. In a real system this would be a credential leak. | Rotate the value, remove it from code, load it from a secret manager, and never return it in responses. |
-| GO-SECRET-02 | Secret / duplicate detector confirmation | Medium | Reachable | `internal/handlers/secrets.go` | A second scanner independently confirms the same reachable synthetic token. | Same as `GO-SECRET-01`; duplicate detections should collapse into the same remediation work. |
-| GO-SECRET-03 | Secret / AWS access key shape | Info | Not reachable | `internal/handlers/secrets.go` | An AWS-shaped synthetic marker is present for detector coverage but is filtered as non-actionable in the latest proof. | Keep only synthetic test markers in fixtures; never put real cloud credentials in source. |
-| GO-SECRET-04 | Secret / workflow token variables | Info | Not reachable | `.github/workflows/reachable-remediate.yml` | `GITHUB_TOKEN` and `GH_TOKEN` are environment variable names used by GitHub tooling, not real secret values. | No code fix required. They should remain filtered/non-actionable. |
+| GO-SECRET-02 | Secret / AWS access key shape | Info | Not reachable | `internal/handlers/secrets.go` | An AWS-shaped synthetic marker is present for detector coverage but is filtered as non-actionable in the latest proof. | Keep only synthetic test markers in fixtures; never put real cloud credentials in source. |
+| GO-SECRET-03 | Secret / workflow token variables | Info | Not reachable / non-production | `.github/workflows/reachable-remediate.yml` | `GITHUB_TOKEN` and `GH_TOKEN` are environment variable names used by GitHub tooling, not real secret values. | No code fix required. They should remain filtered/non-actionable. |
 | GO-DLP-01 | DLP / PII to log | Critical | Reachable | `internal/handlers/dlp.go` | Synthetic SSN and date-of-birth values are written to logs. In production this would create regulated-data exposure. | Mask sensitive values, minimize logging, and add structured audit logging without raw identifiers. |
 | GO-DLP-02 | DLP / PII to outbound HTTP | Critical | Reachable | `internal/handlers/dlp.go` | Synthetic personal data is sent to an external analytics endpoint. | Remove raw PII from outbound telemetry, tokenize fields, and enforce data-sharing controls. |
 | GO-AI-01 | AI / LLM API call with sensitive context | Critical | Reachable | `internal/handlers/ai.go` | User-controlled prompt content is sent to an LLM call in an admin-style context. | Separate system and user messages, treat user content as data, and apply policy checks before model calls. |
@@ -88,10 +103,17 @@ Baseline validation:
 
 ```bash
 cd /Users/alaindazzi/src/reach-core
-scripts/reach-testbed-go-agent-loop.sh \
-  --fixture /Users/alaindazzi/src/reach-testbed-go \
-  --base-branch main \
-  --branch reachable-remediate-demo-$(date +%Y%m%d%H%M%S)
+./reachctl scan /Users/alaindazzi/src/reach-testbed-go \
+  --force-rebuild \
+  --dashboard \
+  --sarif /tmp/reach-testbed-go.sarif \
+  --ai-provider openrouter \
+  --attack-prompt-scope actionable
+
+python3 /Users/alaindazzi/src/reach-testbed-go/ci/validate-expected-results.py \
+  --db /Users/alaindazzi/.reachable/scans/reach-testbed-go-64462931/repo.db \
+  --scan-id 1 \
+  --sarif /tmp/reach-testbed-go.sarif
 ```
 
 Full local remediation proof with Codex:
@@ -107,16 +129,16 @@ scripts/reach-testbed-go-agent-loop.sh \
   --prove
 ```
 
-Full local remediation proof with OpenCode:
+Full local remediation proof with Claude Code:
 
 ```bash
 cd /Users/alaindazzi/src/reach-core
-OPENCODE_MODEL=opencode/deepseek-v4-flash-free \
+ANTHROPIC_API_KEY=... \
 scripts/reach-testbed-go-agent-loop.sh \
   --fixture /Users/alaindazzi/src/reach-testbed-go \
   --base-branch main \
-  --branch reachable-remediate-opencode-$(date +%Y%m%d%H%M%S) \
-  --agent opencode \
+  --branch reachable-remediate-claude-$(date +%Y%m%d%H%M%S) \
+  --agent claude \
   --run-agent \
   --prove
 ```
