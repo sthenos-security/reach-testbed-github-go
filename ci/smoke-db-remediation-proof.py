@@ -230,6 +230,7 @@ def _run_case(
     baseline_present: bool,
     blocking_after: bool,
     defended_after: bool = False,
+    remove_scan_dirs: bool = False,
 ) -> int:
     artifact_dir = tmp / f"artifacts-{name}"
     reports = artifact_dir / "reports"
@@ -244,6 +245,9 @@ def _run_case(
         blocking_after=blocking_after,
         defended_after=defended_after,
     )
+    if remove_scan_dirs:
+        shutil.rmtree(baseline_dir)
+        shutil.rmtree(after_dir)
     (reports / "baseline" / "scan-path.txt").write_text(str(baseline_dir), encoding="utf-8")
     (reports / "after-final" / "scan-path.txt").write_text(str(after_dir), encoding="utf-8")
     env = os.environ.copy()
@@ -302,7 +306,15 @@ def main() -> int:
             blocking_after=False,
             defended_after=True,
         )
-    if pass_status or fail_status or missing_status or defended_status:
+        missing_dirs_status = _run_case(
+            tmp,
+            expected_path=expected_path,
+            name="missing-session-dirs-pass",
+            baseline_present=True,
+            blocking_after=False,
+            remove_scan_dirs=True,
+        )
+    if pass_status or fail_status or missing_status or defended_status or missing_dirs_status:
         print("DB remediation proof smoke failed", file=sys.stderr)
         return 1
     print("DB remediation proof smoke passed")

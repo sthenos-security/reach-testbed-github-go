@@ -290,8 +290,6 @@ def _scan_db_context(scan_path_file: Path) -> dict[str, Any]:
     if not scan_path_file.exists():
         raise FileNotFoundError(f"required scan-path file is missing: {scan_path_file}")
     scan_dir = Path(scan_path_file.read_text(encoding="utf-8").strip())
-    if not scan_dir.exists():
-        raise FileNotFoundError(f"scan directory from {scan_path_file} does not exist: {scan_dir}")
     db_path = scan_dir.parent.parent / "repo.db"
     if not db_path.exists():
         raise FileNotFoundError(f"repo.db is required for demo proof and was not found: {db_path}")
