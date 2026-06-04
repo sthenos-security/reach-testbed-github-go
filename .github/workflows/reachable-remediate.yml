@@ -686,6 +686,7 @@ jobs:
             echo "No Reachable SARIF file was produced."
           fi
           if [ -f "$target" ]; then
+            python3 ci/sanitize-sarif-for-upload.py "$target"
             echo "GitHub code scanning SARIF: $target"
           fi
 

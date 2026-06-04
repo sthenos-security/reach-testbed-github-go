@@ -716,8 +716,6 @@ def _summarize(*, sarif: dict[str, Any], ledger: dict[str, Any], compliance: dic
         for item in findings
         if item["reachability"].lower() in {"exploitable", "reachable"}
     ][:12]
-    if not top_priority:
-        top_priority = findings[:12]
     top_defended = [item for item in findings if _is_defended(item)][:12]
     by_family = Counter(family for item in findings for family in item.get("families", []))
     suspicious_package_count = sum(1 for item in findings if _is_suspicious_package(item))
@@ -850,9 +848,28 @@ def _location(result: dict[str, Any]) -> str:
         return ""
     physical = ((locations[0].get("physicalLocation") or {}) if isinstance(locations[0], dict) else {})
     uri = str(((physical.get("artifactLocation") or {}).get("uri")) or "")
+    uri = _repo_relative_uri(uri)
     region = physical.get("region") or {}
     line = region.get("startLine")
     return f"{uri}:{line}" if uri and line else uri
+
+
+def _repo_relative_uri(uri: str) -> str:
+    if not uri:
+        return ""
+    normalized = uri.replace("\\", "/")
+    repo = os.environ.get("GITHUB_REPOSITORY", "").split("/")[-1] or os.environ.get("CI_PROJECT_NAME", "")
+    if repo:
+        marker = f"/{repo}/"
+        if marker in normalized:
+            return normalized.split(marker, 1)[1]
+    for marker in ("/work/", "/builds/"):
+        if marker in normalized:
+            tail = normalized.split(marker, 1)[1]
+            parts = tail.split("/")
+            if len(parts) > 2:
+                return "/".join(parts[2:])
+    return normalized.lstrip("/")
 
 
 def _priority_key(item: dict[str, str]) -> tuple[int, int, str, str]:
