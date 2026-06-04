@@ -451,6 +451,7 @@ jobs:
               # The coding agent just edited the repository. Run the project's
               # own test suite before any proof scan or remediation branch push
               # so the demo proves the agent did not break normal app behavior.
+              echo "Project test gate: verifying coding-agent edits before Reachable proof scan and branch push."
               echo "Running project tests after agent edits: ${REACHABLE_PROJECT_TEST_COMMAND:-go test ./...}"
               bash -lc "${REACHABLE_PROJECT_TEST_COMMAND:-go test ./...}"
             else
