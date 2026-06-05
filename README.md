@@ -238,7 +238,7 @@ publishes fresh evidence.
 
 | Input | Default | Purpose |
 |-------|---------|---------|
-| `remediate` | `false` | Main kill switch. When false, CI scans and publishes evidence without changing code. |
+| `remediate` | `true` | Main kill switch. When false, CI scans and publishes evidence without changing code. |
 | `rescan_only` | `false` | Verifies `target_branch` as an existing branch; does not invoke an agent or create edits. |
 | `target_branch` | `main` | Baseline branch for normal runs, or the branch to verify when `rescan_only=true`. |
 | `remediation_mode` | `codex-openai` | Selects the agent lane and matching provider secret. |
