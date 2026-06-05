@@ -52,24 +52,20 @@ jobs:
           git push origin "$branch"
           echo "DIAGNOSTIC_BRANCH=$branch" >> "$GITHUB_ENV"
 
-      - name: Create diagnostic PR with GITHUB_TOKEN
+      - name: Create diagnostic PR
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.CI_PR_TOKEN || github.token }}
+          CI_PR_TOKEN: ${{ secrets.CI_PR_TOKEN }}
         run: |
           set -euo pipefail
-          payload="$(python3 - <<'PY'
-          import json
-          import os
-
-          print(json.dumps({
-              "title": "Diagnostic PR permission test",
-              "head": os.environ["DIAGNOSTIC_BRANCH"],
-              "base": "main",
-              "body": "This PR was created by the Debug PR Permissions workflow using only the built-in GITHUB_TOKEN.",
-              "maintainer_can_modify": True,
-          }))
-          PY
-          )"
+          if [ -n "${CI_PR_TOKEN:-}" ]; then
+            echo "Testing PR creation with CI_PR_TOKEN."
+            token_label="CI_PR_TOKEN"
+          else
+            echo "Testing PR creation with GITHUB_TOKEN."
+            token_label="GITHUB_TOKEN"
+          fi
+          payload="$(python3 -c 'import json, os; print(json.dumps({"title": "Diagnostic PR permission test", "head": os.environ["DIAGNOSTIC_BRANCH"], "base": "main", "body": "This PR was created by the Debug PR Permissions workflow using the configured CI PR token path.", "maintainer_can_modify": True}))')"
 
           response="$(mktemp)"
           status="$(curl -sS -o "$response" -w "%{http_code}" \
@@ -82,14 +78,15 @@ jobs:
           echo "PR create HTTP status: $status"
           cat "$response"
           if [ "$status" = "201" ]; then
-            pr_number="$(python3 - "$response" <<'PY'
-            import json
-            import sys
-            print(json.load(open(sys.argv[1], encoding="utf-8"))["number"])
-            PY
-            )"
+            pr_number="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["number"])' "$response")"
             echo "DIAGNOSTIC_PR_NUMBER=$pr_number" >> "$GITHUB_ENV"
             echo "Created diagnostic PR #$pr_number"
+          elif [ "$status" = "403" ]; then
+            if [ "$token_label" = "GITHUB_TOKEN" ]; then
+              echo "::error::GITHUB_TOKEN can push branches, but repository settings currently block GitHub Actions from creating pull requests. Either enable Settings > Actions > General > Allow GitHub Actions to create and approve pull requests, or configure CI_PR_TOKEN."
+            else
+              echo "::error::CI_PR_TOKEN was configured, but GitHub still rejected PR creation. Check that it has contents:write and pull_requests:write for this repository."
+            fi
           fi
           test "$status" = "201"
 
