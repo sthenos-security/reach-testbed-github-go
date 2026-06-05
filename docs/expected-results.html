@@ -315,6 +315,36 @@
     </section>
 
     <section>
+      <h2>Why Defended Rows Do Not Block Release</h2>
+      <p>
+        Reachable keeps defended rows in the evidence when it finds a
+        security-shaped sink, but Enzo attacker cannot prove an external
+        attacker can drive that sink to impact. That gives the release owner an
+        audit trail without forcing a non-exploitable item into the fix queue.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Defended row</th>
+            <th>Why it was found</th>
+            <th>What blocks the attack</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>CWE/200</code><br><code>internal/handlers/cve.go:16</code></td><td>The handler returns an internal request-body read error string.</td><td>The body is read through <code>io.LimitReader</code>, so the request body is bounded; this path is an I/O failure path, not attacker-controlled parser content.</td></tr>
+          <tr><td><code>CWE/200</code><br><code>internal/handlers/cve.go:38</code></td><td><code>language.Parse</code> can produce detailed parsing errors.</td><td>The route first calls <code>safety.AllowedLanguageTag</code>, which allows only <code>en</code>, <code>en-US</code>, <code>fr</code>, <code>fr-FR</code>, <code>es</code>, and <code>es-ES</code>. Attacker-chosen language tags do not reach the parser.</td></tr>
+          <tr><td><code>CWE/200</code><br><code>internal/handlers/suspicious.go:24</code></td><td>The tool-fetch route returns an <code>os.Create</code> error.</td><td>The local file path is fixed with <code>filepath.Join(os.TempDir(), "reach-testbed-tool.bin")</code>. The caller controls the source URL, not the local file path that could shape this error.</td></tr>
+        </tbody>
+      </table>
+      <div class="note">
+        Decision rule: if Enzo attacker proves external control and impact, the
+        row is exploitable and blocks release. If a guard, fixed value, or
+        internal-only branch prevents that proof, the row stays visible as
+        defended evidence.
+      </div>
+    </section>
+
+    <section>
       <h2>Baseline Signal Breakdown</h2>
       <table>
         <thead>

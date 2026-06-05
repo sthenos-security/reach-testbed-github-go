@@ -50,6 +50,24 @@ proof gate passes only when the database comparison shows:
 SARIF may be exported for platform integration, but the demo verdict is based
 only on the database comparison.
 
+## Why Some Rows Are Defended
+
+Reachable reports defended rows when the scanner finds a security-shaped sink
+on a production code path, but Enzo attacker cannot prove a practical attack
+from external input to impact. Those rows stay in the evidence so the audit is
+repeatable, but they do not block the release proof.
+
+| Defended row | Why Reachable keeps it | What prevents the attack |
+|--------------|------------------------|---------------------------|
+| `CWE/200` at `internal/handlers/cve.go:16` | The handler returns an internal read error string. | The request body is read through `io.LimitReader`, so the body is bounded; the returned error is an I/O failure path, not attacker-controlled parser content. |
+| `CWE/200` at `internal/handlers/cve.go:38` | `language.Parse` can produce detailed parsing errors. | The route first calls `safety.AllowedLanguageTag`, which allows only a fixed list: `en`, `en-US`, `fr`, `fr-FR`, `es`, `es-ES`. Attacker-chosen language tags do not reach the parser. |
+| `CWE/200` at `internal/handlers/suspicious.go:24` | The tool-fetch route returns an `os.Create` error. | The file path is fixed with `filepath.Join(os.TempDir(), "reach-testbed-tool.bin")`; the caller controls the source URL, not the local file path that could shape this error. |
+
+If Enzo attacker proves external control and impact, the row is classified as
+exploitable and becomes release-blocking. If the proof cannot establish that
+path because a guard, fixed value, or internal-only branch blocks it, the row is
+defended evidence.
+
 ## Expected Findings Table
 
 `DB signals` shows how many raw database findings are represented by the grouped row; the column totals 28 and reconciles with the golden baseline. Exploitability is the expected attackability or exposure dimension for the grouped finding. `Exploitable` and `Defended` states require Enzo attacker evidence; `Exposure` is used for secret, PII, and sensitive-AI-boundary rows where the security impact is data exposure rather than an attacker proof.
