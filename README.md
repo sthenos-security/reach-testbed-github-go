@@ -19,7 +19,7 @@ use this workflow:
 
 | Action shown in GitHub | Meaning | Run manually? |
 |------------------------|------------------|---------------|
-| `Run Demo` | Scan the vulnerable release candidate, create a fix branch, test it, rescan it, open a PR, and publish the verdict status page. | Yes |
+| `Run Demo` | Scan the vulnerable release candidate, create a fix branch, test it, rescan it, open or prepare a PR, and publish the verdict status page. | Yes |
 | `Reset Demo` | Delete old `reachable-remediate-*` demo branches before a fresh run. | Optional |
 | `pages-build-deployment` | Publish Verdict Status Page. This is GitHub Pages plumbing created automatically after `Run Demo` publishes results. | No |
 
@@ -47,14 +47,31 @@ proof is clean, open a PR, and publish the verdict page.
 | `run_project_tests` | `true` | Run `go test ./...` after the patch, before the security proof scan. |
 
 Expected result: the workflow creates a `reachable-remediate-*` branch, runs
-the project test gate, rescans that branch, opens a PR, and publishes the proof
-page.
+the project test gate, rescans that branch, and publishes the proof page. If
+GitHub accepts CI pull-request creation, the workflow also opens the PR. If
+GitHub blocks API PR creation, use the manual fallback below; the remediation
+branch and DB-backed proof page are still the evidence.
 
 Automatic PR creation is controlled by CI permissions, not by Reachable scanner
 tokens. Branch push, artifact upload, Pages publishing, and SARIF upload use the
 built-in `GITHUB_TOKEN`; PR creation uses that same workflow token when the
 repository allows GitHub Actions to create pull requests. Branch protection and
 review policy still decide whether anything can merge.
+
+### Manual PR Fallback
+
+Use this if the workflow publishes a clean proof page and pushes the
+`reachable-remediate-<run_id>` branch, but GitHub blocks automatic PR creation.
+
+1. Open the repository [Branches page](https://github.com/sthenos-security/reach-testbed-go/branches).
+2. Find the latest `reachable-remediate-<run_id>` branch from the successful `Run Demo` log or verdict page.
+3. Click **New pull request** for that branch.
+4. Confirm `base: main` and `compare: reachable-remediate-<run_id>`.
+5. Create the PR and review the code diff together with the DB-backed proof page.
+
+The manual PR is only a review wrapper around the already-published evidence:
+the workflow has already pushed the remediation branch, run the project test
+gate, rescanned the branch, and published the proof artifacts.
 
 ### Run A Scan-Only Evidence Demo
 
