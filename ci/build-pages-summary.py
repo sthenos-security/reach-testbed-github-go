@@ -463,10 +463,15 @@ def _public_signal(row: dict[str, Any]) -> dict[str, Any]:
         public["attacker"] = {
             "exploitable": attacker.get("exploitable"),
             "severity": attacker.get("severity"),
+            "defense_rationale": attacker.get("defense_rationale"),
+            "blocked_by": _blocked_by_list(attacker.get("blocked_by_json")),
             "model_used": attacker.get("model_used"),
             "created_at": attacker.get("created_at"),
             "error": attacker.get("error"),
         }
+    evidence = _defense_evidence(row)
+    if evidence:
+        public["defense_evidence"] = evidence
     return {key: value for key, value in public.items() if value not in (None, "")}
 
 
@@ -603,6 +608,7 @@ def _observed_public_row(row: dict[str, Any]) -> dict[str, Any]:
         "location": location,
         "package": _package_label(row),
         "message": str(row.get("title") or row.get("description") or row.get("rule_id") or ""),
+        "evidence": _defense_evidence(row),
     }
 
 
@@ -621,6 +627,42 @@ def _signal_exploitability(row: dict[str, Any]) -> str:
     if reachability in DEFENDED_STATES:
         return "DEFENDED"
     return "NOT ATTACKED"
+
+
+def _blocked_by_list(value: Any) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item).strip()]
+    if not isinstance(value, str):
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return [value] if value.strip() else []
+    if isinstance(parsed, list):
+        return [str(item) for item in parsed if str(item).strip()]
+    if isinstance(parsed, dict):
+        return [f"{key}: {val}" for key, val in parsed.items() if str(val).strip()]
+    return [str(parsed)] if str(parsed).strip() else []
+
+
+def _defense_evidence(row: dict[str, Any]) -> str:
+    attacker = row.get("attacker") if isinstance(row.get("attacker"), dict) else {}
+    parts: list[str] = []
+    rationale = str(attacker.get("defense_rationale") or "").strip() if attacker else ""
+    if rationale:
+        parts.append(rationale)
+    blocked_by = _blocked_by_list(attacker.get("blocked_by_json")) if attacker else []
+    if blocked_by:
+        parts.append("Blocked by: " + "; ".join(blocked_by[:3]))
+    if parts:
+        return " ".join(parts)
+    if _signal_exploitability(row) == "DEFENDED":
+        return "Classified as defended because Reachable found the code path but Enzo attacker did not confirm an exploitable path."
+    if not _signal_blocks_remediation(row):
+        return "Not release-blocking in the proof database."
+    return ""
 
 
 def _observed_sort_key(row: dict[str, Any]) -> tuple[int, int, str, str]:
@@ -1198,9 +1240,6 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
     rows = "\n".join(_issue_row(item) for item in summary.get("top") or [])
     if not rows:
         rows = '<tr><td colspan="8">No release-blocking signals were reported.</td></tr>'
-    rule_rows = "\n".join(_rule_row(item) for item in remediation.get("selected_rules") or [])
-    if not rule_rows:
-        rule_rows = '<tr><td colspan="4">No remediation rules were selected in this run.</td></tr>'
     expected_rows = "\n".join(_expected_demo_row(item) for item in expected_demo.get("rows") or [])
     if not expected_rows:
         expected_rows = '<tr><td colspan="9">No checked-in expected baseline contract was found.</td></tr>'
@@ -1378,10 +1417,7 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
     <h2 id="remediation">Remediation Attempt</h2>
     <p>Status: <strong>{html.escape(str(remediation.get("status") or "unknown"))}</strong>. {html.escape(str(remediation.get("message") or ""))}</p>
     {_remediation_loop_table(remediation, expected_demo)}
-    <table>
-      <thead><tr><th>Rule</th><th>Package</th><th>Signals</th><th>Suggested fix</th></tr></thead>
-      <tbody>{rule_rows}</tbody>
-    </table>
+    <p class="muted">Detailed remediation rules are intentionally not published because they are generated prompt material. The public evidence shows the branch, batch count, project-test gate, proof scan, and final DB verdict.</p>
     <p class="muted">Generated at {html.escape(generated_at)} for {html.escape(str(summary.get("repo") or ""))} / {html.escape(str(summary.get("ref") or ""))} / commit {html.escape(str(summary.get("sha") or ""))}. Page URL: {html.escape(page_url)}</p>
     <footer>Copyright © 2026 Sthenos Security, Inc. All rights reserved.</footer>
   </main>
@@ -1533,7 +1569,7 @@ def _observed_scan_panel(title: str, observed: dict[str, Any]) -> str:
       <h3>{html.escape(title)}</h3>
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Signal</th><th>Risk</th><th>Reachability</th><th>Exploitability</th><th>Release blocker</th><th>Location</th><th>Package</th><th>Message</th></tr></thead>
+        <thead><tr><th>Signal</th><th>Risk</th><th>Reachability</th><th>Exploitability</th><th>Release blocker</th><th>Location</th><th>Package</th><th>Message / evidence</th></tr></thead>
           <tbody>{table_rows}</tbody>
         </table>
       </div>
@@ -1543,6 +1579,10 @@ def _observed_scan_panel(title: str, observed: dict[str, Any]) -> str:
 def _observed_scan_row(item: dict[str, Any]) -> str:
     blocker = "Yes" if item.get("blocks_release") else "No"
     blocker_class = "bad" if item.get("blocks_release") else "reachable"
+    evidence = str(item.get("evidence") or "")
+    message = str(item.get("message") or "")
+    if evidence:
+        message = f"{message} Why: {evidence}" if message else f"Why: {evidence}"
     return (
         "<tr>"
         f"<td><code>{html.escape(str(item.get('id') or ''))}</code><br><span class=\"muted\">{html.escape(str(item.get('signal_type') or ''))}</span></td>"
@@ -1552,7 +1592,7 @@ def _observed_scan_row(item: dict[str, Any]) -> str:
         f"<td><span class=\"{blocker_class}\">{html.escape(blocker)}</span></td>"
         f"<td><code>{html.escape(str(item.get('location') or ''))}</code></td>"
         f"<td>{html.escape(str(item.get('package') or ''))}</td>"
-        f"<td>{html.escape(str(item.get('message') or ''))}</td>"
+        f"<td>{html.escape(message)}</td>"
         "</tr>"
     )
 
@@ -1669,6 +1709,15 @@ def _expected_demo_row(item: dict[str, Any]) -> str:
     remediation_action = str(item.get("remediation_action") or _expected_business_value(item))
     if item.get("deferred") and item.get("deferred_reason"):
         remediation_action = f"Deferred for this demo: {item.get('deferred_reason')}"
+    after_signal = item.get("after_signal") if isinstance(item.get("after_signal"), dict) else {}
+    baseline_signal = item.get("baseline_signal") if isinstance(item.get("baseline_signal"), dict) else {}
+    defense_evidence = str(
+        after_signal.get("defense_evidence")
+        or baseline_signal.get("defense_evidence")
+        or ""
+    )
+    if defense_evidence and status in {"defended_after_remediation", "deferred_manual_review"}:
+        remediation_action = f"{remediation_action} Why: {defense_evidence}"
     problem_ref = str(item.get("problem_ref") or "expected-results.html#expected-findings-table")
     detail_html = ""
     if details:
