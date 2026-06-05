@@ -117,6 +117,9 @@ jobs:
       # demo past the expected workflow window. Repositories can override with
       # the REACHABLE_AGENT_TIMEOUT_SECONDS variable for larger codebases.
       REACHABLE_AGENT_TIMEOUT_SECONDS: ${{ vars.REACHABLE_AGENT_TIMEOUT_SECONDS || '180' }}
+      # Same guardrail for Reachable's remediation-bundle synthesis. This runs
+      # before the coding agent, so it needs its own timeout.
+      REACHABLE_REMEDIATE_TIMEOUT_SECONDS: ${{ vars.REACHABLE_REMEDIATE_TIMEOUT_SECONDS || '120' }}
 
       # Reachable product/integration tokens. These are for Reachable API and
       # GitHub metadata/package enrichment, not for controlling the workflow.
@@ -474,8 +477,10 @@ jobs:
               done
             fi
 
+            bundle_timeout="${REACHABLE_REMEDIATE_TIMEOUT_SECONDS:-120}"
+            echo "Reachable remediation bundle timeout for batch $batch: ${bundle_timeout}s"
             set +e
-            reachctl remediate \
+            timeout --foreground "${bundle_timeout}s" reachctl remediate \
               --workspace . \
               --agent "$prompt_agent" \
               --branch-name "$REACHABLE_REMEDIATION_BRANCH" \
@@ -484,6 +489,9 @@ jobs:
             remediate_status="$?"
             set -e
             if [ "$remediate_status" -ne 0 ]; then
+              if [ "$remediate_status" -eq 124 ]; then
+                echo "reachctl remediate timed out for batch $batch after ${bundle_timeout}s." >&2
+              fi
               echo "reachctl remediate exited with status ${remediate_status}; continuing only if a bundle was produced."
             fi
             if [ ! -f .reachable/remediation-bundle/bundle.json ]; then
