@@ -19,9 +19,9 @@ use this workflow:
 
 | Action shown in GitHub | Customer meaning | Run manually? |
 |------------------------|------------------|---------------|
-| `Run Demo` | Scan the vulnerable release candidate, create a fix branch, test it, rescan it, open a PR, and publish the proof report. | Yes |
+| `Run Demo` | Scan the vulnerable release candidate, create a fix branch, test it, rescan it, open a PR, and publish the verdict status page. | Yes |
 | `Reset Demo` | Delete old `reachable-remediate-*` demo branches before a fresh run. | Optional |
-| `pages-build-deployment` | Publish Report. This is GitHub Pages plumbing created automatically after `Run Demo` publishes results. | No |
+| `pages-build-deployment` | Publish Verdict Status Page. This is GitHub Pages plumbing created automatically after `Run Demo` publishes results. | No |
 
 ### Run A Full Fix Demo
 
@@ -89,7 +89,7 @@ release blockers, and publishes proof for that branch.
 | Project tests | The patch still passes the application test command. |
 | Proof scan | Reachable rescanned the fix branch from the database source of truth. |
 | Pull request | The fix is ready for normal review and merge policy. |
-| Public proof page | Sanitized evidence shows baseline findings, fixed findings, branch, commit, scan IDs, timestamps, runtime, AI cost, and artifact links. |
+| Public verdict status page | Sanitized evidence shows baseline findings, fixed findings, branch, commit, scan IDs, timestamps, runtime, AI cost, and artifact links. |
 
 ### Actions Menu
 
@@ -97,7 +97,7 @@ release blockers, and publishes proof for that branch.
 |----------|---------|
 | `Run Demo` | Main demo workflow. Run this to show the release-gate loop. |
 | `Reset Demo` | Deletes old `reachable-remediate-*` branches when resetting the demo. Use `dry_run=true` first if you want to preview. |
-| `pages-build-deployment` | Publish Report. This is GitHub Pages plumbing. Do not run it manually; it appears after `Run Demo` publishes results. |
+| `pages-build-deployment` | Publish Verdict Status Page. This is GitHub Pages plumbing. Do not run it manually; it appears after `Run Demo` publishes results. |
 
 ### CI Helper Scripts
 
@@ -126,7 +126,7 @@ GitHub Actions:
 | What do I configure? | Add one AI key as a repository secret: `OPENAI_API_KEY` for `codex-openai` / Codex (OpenAI), or `ANTHROPIC_API_KEY` for `claude-anthropic` / Claude Code (Anthropic). Optional workflow inputs are listed below. |
 | Where is the CI pipeline? | [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml). That workflow scans, optionally remediates, rescans, verifies the DB proof, and publishes sanitized evidence. |
 | Where do I run it? | GitHub Actions → [Run Demo](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate.yml). |
-| Where are the verdict and artifacts? | [Public proof page](https://sthenos-security.github.io/reach-testbed-go/) and [published artifacts](https://sthenos-security.github.io/reach-testbed-go/#artifacts). |
+| Where are the verdict and artifacts? | [Public verdict status page](https://sthenos-security.github.io/reach-testbed-go/) and [published artifacts](https://sthenos-security.github.io/reach-testbed-go/#artifacts). |
 | What is the expected vulnerable contract? | [EXPECTED.md](EXPECTED.md) and [expected/baseline.json](expected/baseline.json). |
 
 ## Demo Verdict
