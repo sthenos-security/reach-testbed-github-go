@@ -36,8 +36,8 @@ Click **Run workflow** and set:
 | `remediation_mode` | `codex-openai` | Uses Codex with `OPENAI_API_KEY`. Use `claude-anthropic` only when validating Claude Code with `ANTHROPIC_API_KEY`. |
 | `prompt_profile` | `balanced` | Keeps fixes scoped: enough context to repair the issue queue without turning the run into an open-ended refactor. |
 | `signal_types` | `all` | Covers all demo blocker classes: CVE, CWE, secret, DLP, and AI findings. |
-| `max_batches` | `1` | One bounded fix batch for the live demo. |
-| `rescan_strategy` | `final` | Run the proof scan after the patch and project tests complete. |
+| `max_batches` | `5` | Upper bound for serialized fix batches. The workflow stops early as soon as the DB proof is clean. |
+| `rescan_strategy` | `each_batch` | Rescan after each bounded patch batch so CI can stop once release blockers are gone. |
 | `require_ai` | `true` | Fail fast if the selected AI key is missing, instead of producing a confusing partial run. |
 | `fresh_scan` | `false` | Reuse the Reachable cache for speed. Set `true` only when you intentionally want a clean no-cache evidence run. |
 | `create_pr` | `true` | Open the reviewable fix PR for the release manager. |
@@ -167,10 +167,12 @@ is the implementation. At a high level, each demo run follows this sequence:
 5. The selected coding agent edits a dedicated `reachable-remediate-*` branch.
 6. The project test command runs to catch ordinary build or behavior breaks.
 7. Reachable rescans the remediation branch into a new proof database.
-8. The proof database is compared with the expected contract. The pass
+8. If the proof database still has release blockers, CI generates another
+   bounded batch from the updated database state, up to `max_batches`.
+9. The proof database is compared with the expected contract. The pass
    condition is zero remaining release blockers. Rescan-only verification uses
    the same database release-blocker gate; SARIF is never the pass/fail source.
-9. CI publishes a sanitized Pages report and support artifacts with the exact
+10. CI publishes a sanitized Pages report and support artifacts with the exact
    scan IDs, branch names, commits, timestamps, runtime, cache state, and AI
    cost telemetry.
 
@@ -239,8 +241,8 @@ publishes fresh evidence.
 | `remediation_mode` | `codex-openai` | Selects the agent lane and matching provider secret. |
 | `prompt_profile` | `balanced` | Controls how aggressively Reachable bundles remediation work. |
 | `signal_types` | `all` | Limits remediation to selected signal families, or leaves all families eligible. |
-| `max_batches` | `1` | Bounds the number of serialized agent remediation batches. |
-| `rescan_strategy` | `final` | Runs proof scans only at the end or after each batch. |
+| `max_batches` | `5` | Bounds the number of serialized agent remediation batches. CI stops early when the DB proof is clean. |
+| `rescan_strategy` | `each_batch` | Runs proof scans after each batch so the workflow can stop as soon as the branch is clean. |
 | `scan_extra_flags` | empty | Optional extra scan flags for advanced test runs. |
 | `require_ai` | `true` | Fails early unless the selected provider key is configured. |
 | `fresh_scan` | `false` | Starts from an empty `~/.reachable` cache for a clean evidence run. |

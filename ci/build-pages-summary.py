@@ -990,6 +990,14 @@ def _remediation_summary(ledger: dict[str, Any]) -> dict[str, Any]:
     outcome = ledger.get("outcome") if isinstance(ledger.get("outcome"), dict) else {}
     attempts = ledger.get("attempts") or []
     scans = ledger.get("scans") or []
+    workflow = ledger.get("workflow") if isinstance(ledger.get("workflow"), dict) else {}
+    inputs = workflow.get("inputs") if isinstance(workflow.get("inputs"), dict) else {}
+    batch_scans = [
+        scan
+        for scan in scans
+        if isinstance(scan, dict) and str(scan.get("label") or "").startswith("after-batch-")
+    ]
+    used_batches = max(len(batch_scans), len(attempts))
     selected_rules = []
     for attempt in attempts:
         if isinstance(attempt, dict):
@@ -998,6 +1006,11 @@ def _remediation_summary(ledger: dict[str, Any]) -> dict[str, Any]:
         "status": outcome.get("status") or ledger.get("status") or "unknown",
         "message": outcome.get("message") or ledger.get("message") or "",
         "attempt_count": len(attempts),
+        "used_batches": used_batches,
+        "max_batches": _safe_int(inputs.get("max_batches")) or used_batches,
+        "rescan_strategy": str(inputs.get("rescan_strategy") or ""),
+        "remediation_branch": str(ledger.get("remediation_branch") or ""),
+        "batch_scan_labels": [str(scan.get("label") or "") for scan in batch_scans],
         "scan_count": len(scans),
         "proof_scan": ledger.get("proof_scan") or {},
         "selected_rule_count": len(selected_rules),
@@ -1253,12 +1266,14 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
         {_card("Fixed on remediation branch", str(expected_demo.get("fixed", 0)))}
         {_card("Still present", str(expected_demo.get("still_present", 0)))}
         {_card("Final release blockers", str(expected_demo.get("after_total") if expected_demo.get("after_total") is not None else "not run"))}
+        {_card("Remediation batches", _batch_count_label(remediation))}
         {_card("AI cost estimate", _money(ai_economics.get("cost_usd")))}
         {_card("AI tokens", _number(ai_economics.get("tokens_total")))}
       </div>
       <div class="subgrid">
         {_proof_panel("Vulnerable baseline", baseline_meta, baseline_ai)}
         {_proof_panel("Remediated branch proof", after_meta, after_ai)}
+        {_remediation_batch_panel(remediation, expected_demo)}
         {_run_evidence_panel(run_evidence_summary)}
       </div>
     </section>
@@ -1333,6 +1348,7 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
     </table>
     <h2 id="remediation">Remediation Attempt</h2>
     <p>Status: <strong>{html.escape(str(remediation.get("status") or "unknown"))}</strong>. {html.escape(str(remediation.get("message") or ""))}</p>
+    {_remediation_loop_table(remediation, expected_demo)}
     <table>
       <thead><tr><th>Rule</th><th>Package</th><th>Signals</th><th>Suggested fix</th></tr></thead>
       <tbody>{rule_rows}</tbody>
@@ -1347,6 +1363,60 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
 
 def _card(label: str, value: str) -> str:
     return f'<div class="card"><div class="num">{html.escape(value)}</div><div class="label">{html.escape(label)}</div></div>'
+
+
+def _batch_count_label(remediation: dict[str, Any]) -> str:
+    used = _safe_int(remediation.get("used_batches") or remediation.get("attempt_count"))
+    allowed = _safe_int(remediation.get("max_batches"))
+    if allowed:
+        return f"{used}/{allowed}"
+    return str(used)
+
+
+def _remediation_stop_reason(remediation: dict[str, Any], expected_demo: dict[str, Any]) -> str:
+    if expected_demo.get("clean"):
+        return "Stopped early because the DB proof was clean."
+    used = _safe_int(remediation.get("used_batches") or remediation.get("attempt_count"))
+    allowed = _safe_int(remediation.get("max_batches"))
+    if allowed and used >= allowed:
+        return "Stopped because the configured maximum remediation batches was reached."
+    if used:
+        return "Stopped because no further agent changes were produced; DB proof remains the authority."
+    return "No remediation batch ran."
+
+
+def _remediation_batch_panel(remediation: dict[str, Any], expected_demo: dict[str, Any]) -> str:
+    branch = str(remediation.get("remediation_branch") or "")
+    strategy = str(remediation.get("rescan_strategy") or "")
+    labels = ", ".join(str(label) for label in remediation.get("batch_scan_labels") or []) or "none"
+    return (
+        '<div class="card">'
+        "<h2>Bounded remediation loop</h2>"
+        f"<p><strong>Batches used:</strong> {html.escape(_batch_count_label(remediation))}<br>"
+        f"<strong>Proof strategy:</strong> {html.escape(strategy or 'final')}<br>"
+        f"<strong>Remediation branch:</strong> <code>{html.escape(branch or 'n/a')}</code><br>"
+        f"<strong>Batch proof scans:</strong> {html.escape(labels)}<br>"
+        f"<strong>Stop reason:</strong> {html.escape(_remediation_stop_reason(remediation, expected_demo))}</p>"
+        "</div>"
+    )
+
+
+def _remediation_loop_table(remediation: dict[str, Any], expected_demo: dict[str, Any]) -> str:
+    rows = [
+        ("Configured maximum batches", str(_safe_int(remediation.get("max_batches")) or "not set")),
+        ("Batches used", str(_safe_int(remediation.get("used_batches") or remediation.get("attempt_count")))),
+        ("Rescan strategy", str(remediation.get("rescan_strategy") or "final")),
+        ("Stop condition", _remediation_stop_reason(remediation, expected_demo)),
+        ("Final DB release blockers", str(_safe_int(expected_demo.get("after_total")))),
+    ]
+    body = "\n".join(
+        f"<tr><th>{html.escape(label)}</th><td>{html.escape(value)}</td></tr>"
+        for label, value in rows
+    )
+    return (
+        '<p class="muted">Reachable runs a bounded remediation loop: generate one focused task from the current scan database, let the agent patch the review branch, run project tests, rescan the branch into repo.db, then stop as soon as the DB proof is clean or when the configured maximum is reached.</p>'
+        f"<table><tbody>{body}</tbody></table>"
+    )
 
 
 def _proof_panel(title: str, meta: dict[str, Any], ai: dict[str, Any]) -> str:

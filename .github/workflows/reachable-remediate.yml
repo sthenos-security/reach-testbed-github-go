@@ -39,11 +39,11 @@ on:
       max_batches:
         description: "Maximum serialized remediation batches"
         type: number
-        default: 1
+        default: 5
       rescan_strategy:
         description: "When to run Reachable proof rescans during remediation"
         type: choice
-        default: final
+        default: each_batch
         options:
           - final
           - each_batch
@@ -525,6 +525,9 @@ jobs:
             batch_scan_end="$(date +%s)"
             echo "Reachable proof scan duration for batch $batch: $((batch_scan_end - batch_scan_start))s"
             bash ci/collect-reachable-report.sh "after-batch-${batch}" .reachable/ci-artifacts
+            rm -rf .reachable/ci-artifacts/reports/after-final
+            cp -R ".reachable/ci-artifacts/reports/after-batch-${batch}" .reachable/ci-artifacts/reports/after-final
+            cp ".reachable/ci-artifacts/reachable-after-batch-${batch}.sarif" .reachable/ci-artifacts/reachable-after-final.sarif
             python ci/write-remediation-ledger.py .reachable/ci-artifacts .reachable/remediation-bundle/bundle.json
             latest_scan_path="$(python -c "from pathlib import Path; root=Path.home()/'.reachable'/'scans'; candidates=[p for p in root.glob('*/*/20*') if p.is_dir()]; print(max(candidates, key=lambda p: p.stat().st_mtime) if candidates else '')")"
             if [ -z "$latest_scan_path" ]; then
@@ -534,9 +537,25 @@ jobs:
             echo "Reachable latest scan path: $latest_scan_path"
             reachctl audit --scan-path "$latest_scan_path" --summary
             reachctl integrity --scan-path "$latest_scan_path"
+            set +e
+            python ci/check-db-remediation-proof.py .reachable/ci-artifacts
+            proof_status="$?"
+            set -e
+            if [ "$proof_status" -eq 0 ]; then
+              echo "Reachable DB proof is clean after batch $batch/$max_batches; stopping remediation loop early."
+              break
+            fi
+            if [ "$batch" -lt "$max_batches" ]; then
+              echo "Reachable DB proof still has blockers after batch $batch/$max_batches; generating another bounded batch from the updated DB state."
+            else
+              echo "Reachable DB proof still has blockers after the maximum $max_batches batch(es); final gate will fail and publish the DB-backed evidence."
+            fi
 
             if [ -z "$(git status --porcelain -- . ':(exclude).reachable' ':(exclude).reachable/**' ':(exclude)reachable*.sarif')" ]; then
-              echo "No workspace changes after batch $batch; stopping."
+              echo "No workspace changes after batch $batch."
+              if [ "$proof_status" -ne 0 ]; then
+                echo "The DB proof is not clean and the agent produced no further changes; stopping so the proof gate can fail with evidence."
+              fi
               break
             fi
           done
