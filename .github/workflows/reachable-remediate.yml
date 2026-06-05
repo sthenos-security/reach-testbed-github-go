@@ -111,6 +111,7 @@ jobs:
       REACHABLE_RUN_PROJECT_TESTS: ${{ inputs.run_project_tests }}
       REACHABLE_PROJECT_TEST_COMMAND: ${{ inputs.project_test_command }}
       REACHABLE_AGENT_LOG_DIR: .reachable/private-agent-logs
+      REACHABLE_AGENT_TIMEOUT_SECONDS: ${{ vars.REACHABLE_AGENT_TIMEOUT_SECONDS || '600' }}
 
       # Reachable product/integration tokens. These are for Reachable API and
       # GitHub metadata/package enrichment, not for controlling the workflow.
@@ -488,12 +489,18 @@ jobs:
 
             mkdir -p "${REACHABLE_AGENT_LOG_DIR:-.reachable/private-agent-logs}"
             agent_log="${REACHABLE_AGENT_LOG_DIR:-.reachable/private-agent-logs}/agent-batch-${batch}.log"
+            agent_timeout="${REACHABLE_AGENT_TIMEOUT_SECONDS:-600}"
+            echo "Coding agent timeout for batch $batch: ${agent_timeout}s"
             set +e
-            ./ci/run-agent.sh "$REACHABLE_AGENT" .reachable/remediation-bundle/prompt.md > "$agent_log" 2>&1
+            timeout --foreground "${agent_timeout}s" ./ci/run-agent.sh "$REACHABLE_AGENT" .reachable/remediation-bundle/prompt.md > "$agent_log" 2>&1
             agent_status="$?"
             set -e
             if [ "$agent_status" -ne 0 ]; then
-              echo "Coding agent failed for batch $batch with exit code $agent_status." >&2
+              if [ "$agent_status" -eq 124 ]; then
+                echo "Coding agent timed out for batch $batch after ${agent_timeout}s." >&2
+              else
+                echo "Coding agent failed for batch $batch with exit code $agent_status." >&2
+              fi
               echo "Sanitized agent CLI diagnostics:" >&2
               grep -Eai '(^error:|not found|unknown option|unexpected argument|permission|auth|api key|usage:|failed|invalid)' \
                 "$agent_log" | tail -30 >&2 || true
