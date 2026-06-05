@@ -112,7 +112,11 @@ jobs:
       REACHABLE_RUN_PROJECT_TESTS: ${{ inputs.run_project_tests }}
       REACHABLE_PROJECT_TEST_COMMAND: ${{ inputs.project_test_command }}
       REACHABLE_AGENT_LOG_DIR: .reachable/private-agent-logs
-      REACHABLE_AGENT_TIMEOUT_SECONDS: ${{ vars.REACHABLE_AGENT_TIMEOUT_SECONDS || '600' }}
+      # Demo guardrail: a compact testbed agent batch should finish quickly.
+      # Keep this short so a stuck coding-agent CLI cannot hold the customer
+      # demo past the expected workflow window. Repositories can override with
+      # the REACHABLE_AGENT_TIMEOUT_SECONDS variable for larger codebases.
+      REACHABLE_AGENT_TIMEOUT_SECONDS: ${{ vars.REACHABLE_AGENT_TIMEOUT_SECONDS || '180' }}
 
       # Reachable product/integration tokens. These are for Reachable API and
       # GitHub metadata/package enrichment, not for controlling the workflow.
