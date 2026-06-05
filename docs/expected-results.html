@@ -273,6 +273,24 @@
       <table>
         <thead>
           <tr>
+            <th>Release category</th>
+            <th>Rows before</th>
+            <th>Expected proof</th>
+            <th>Remediated?</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Exploitable blockers</td><td>9</td><td>0</td><td>Yes</td><td>Enzo attacker proved external control and impact. These are mandatory fixes.</td></tr>
+          <tr><td>Not-attacked / exposure blockers</td><td>9</td><td>0</td><td>Yes</td><td>No attacker proof is required for reachable CVEs, embedded secrets, PII/DLP exposure, or AI-boundary authority risk. They still block release while present.</td></tr>
+          <tr><td>Defended attacker evidence</td><td>3</td><td>0 blockers</td><td>No, unless a fix naturally removes them</td><td>Reachable found the path, but Enzo attacker could not prove a practical attack. These rows are audit evidence, not release blockers.</td></tr>
+          <tr><td>Filtered fixture evidence</td><td>7</td><td>Nonblocking</td><td>No</td><td>Synthetic not-reachable or non-production markers prove scanner coverage and are not part of the fix queue.</td></tr>
+          <tr><td><strong>Total raw DB signals</strong></td><td><strong>28</strong></td><td><strong>0 release blockers</strong></td><td><strong>18 remediated blockers</strong></td><td>The proof scan passes when the release-blocking queue is zero.</td></tr>
+        </tbody>
+      </table>
+      <table>
+        <thead>
+          <tr>
             <th>Fix category</th>
             <th>Rows</th>
             <th>Exploitability</th>

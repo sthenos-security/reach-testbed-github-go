@@ -55,6 +55,42 @@ def main() -> int:
     assert summary["top_priority"] == [], "defended rows must not appear in exploitable/reachable priority"
     assert len(summary["top_defended"]) == 1, "defended rows should stay in defended section"
     assert summary["top_defended"][0]["location"] == "internal/handlers/cwe.go:12"
+    status_stats = mod._observed_status_stats(
+        [
+            {"blocks_release": True, "deferred": False, "exploitability": "EXPLOITABLE"},
+            {"blocks_release": True, "deferred": False, "exploitability": "NOT ATTACKED"},
+            {"blocks_release": False, "deferred": False, "exploitability": "DEFENDED"},
+            {"blocks_release": False, "deferred": False, "exploitability": "NOT ATTACKED"},
+            {"blocks_release": False, "deferred": True, "exploitability": "NOT ATTACKED"},
+        ]
+    )
+    assert status_stats["release_blockers"] == 2
+    assert status_stats["exploitable_blockers"] == 1
+    assert status_stats["not_attacked_blockers"] == 1
+    assert status_stats["defended"] == 1
+    assert status_stats["not_attacked_evidence"] == 1
+    assert status_stats["deferred"] == 1
+    expected_contract = {
+        "db": {
+            "total_signals": 28,
+            "action_required": {"total": 18},
+            "attacker": {"exploitable": 9, "defended": 3},
+        }
+    }
+    demo_stats = mod._demo_status_stats(
+        expected=expected_contract,
+        rows=[],
+        observed_before={"stats": {}},
+        observed_after={"stats": {}},
+        after_actionable_total=0,
+    )
+    expected_stats = demo_stats["expected"]
+    assert expected_stats["raw_db_signals"] == 28
+    assert expected_stats["release_blockers"] == 18
+    assert expected_stats["exploitable_blockers"] == 9
+    assert expected_stats["not_attacked_or_exposure_blockers"] == 9
+    assert expected_stats["defended_evidence"] == 3
+    assert expected_stats["filtered_fixture_evidence"] == 7
 
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "reachable-code-scanning.sarif"

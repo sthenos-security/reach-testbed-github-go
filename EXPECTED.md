@@ -25,6 +25,14 @@ CI validates the baseline database against that contract before remediation.
 
 Expected release decision:
 
+| Release category | Rows before | Expected proof | Remediated? | Meaning |
+|------------------|------------:|----------------|-------------|---------|
+| Exploitable blockers | 9 | 0 | Yes | Enzo attacker proved external control and impact. These are mandatory fixes. |
+| Not-attacked / exposure blockers | 9 | 0 | Yes | No attacker proof is required for reachable CVEs, embedded secrets, PII/DLP exposure, or AI-boundary authority risk. They still block release while present. |
+| Defended attacker evidence | 3 | 0 blockers | No, unless a fix naturally removes them | Reachable found the path, but Enzo attacker could not prove a practical attack. These rows are audit evidence, not release blockers. |
+| Filtered fixture evidence | 7 | Nonblocking | No | Synthetic not-reachable or non-production markers prove scanner coverage and are not part of the fix queue. |
+| **Total raw DB signals** | **28** | **0 release blockers** | **18 remediated blockers** | The proof scan passes when the release-blocking queue is zero. |
+
 | Family | Expected signals | Release blockers | Exploitability dimension | Nonblocking evidence | Expected proof |
 |--------|-----------------:|-----------------:|--------------------------|---------------------|----------------|
 | CVE | 1 | 1 | Reachable, not attack-proofed | 0 | Fixed dependency version; CVE row absent from proof scan. |

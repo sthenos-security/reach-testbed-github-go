@@ -265,6 +265,16 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
     else:
         headline = "The remediation proof scan still has expected findings to review."
 
+    observed_before = _db_observed_scan(baseline_ctx)
+    observed_after = _db_observed_scan(after_ctx, deferred_keys=set(deferred_rows))
+    stats = _demo_status_stats(
+        expected=expected,
+        rows=rows,
+        observed_before=observed_before,
+        observed_after=observed_after,
+        after_actionable_total=after_actionable_total,
+    )
+
     return {
         "available": True,
         "name": expected.get("name") or "reach-testbed-go golden baseline",
@@ -286,9 +296,10 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
         "baseline_ai": baseline_ai,
         "after_ai": after_ai,
         "observed": {
-            "before": _db_observed_scan(baseline_ctx),
-            "after": _db_observed_scan(after_ctx, deferred_keys=set(deferred_rows)),
+            "before": observed_before,
+            "after": observed_after,
         },
+        "stats": stats,
         "evidence_source": "repo.db",
     }
 
@@ -593,7 +604,109 @@ def _db_observed_scan(
         "db_total_findings": _safe_int((ctx.get("meta") or {}).get("total_findings")),
         "production_rows": len(public_rows),
         "release_blockers": sum(1 for row in public_rows if row.get("blocks_release")),
+        "stats": _observed_status_stats(public_rows),
         "rows": public_rows,
+    }
+
+
+def _observed_status_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize the public DB rows by release-decision category.
+
+    The page deliberately separates release blockers from evidence-only rows:
+    a row can be "not attacked" and still block release if it is a reachable
+    dependency, secret, DLP/PII, or AI-boundary exposure. Conversely, defended
+    rows are retained as evidence and do not block release.
+    """
+    stats: dict[str, Any] = {
+        "total": len(rows),
+        "release_blockers": 0,
+        "deferred": 0,
+        "evidence_only": 0,
+        "defended": 0,
+        "not_attacked_blockers": 0,
+        "not_attacked_evidence": 0,
+        "exploitable_blockers": 0,
+        "uncertain_blockers": 0,
+        "by_exploitability": {},
+        "by_release_status": {},
+    }
+    by_exploitability: Counter[str] = Counter()
+    by_release_status: Counter[str] = Counter()
+    for row in rows:
+        exploitability = str(row.get("exploitability") or "UNKNOWN").upper()
+        by_exploitability[exploitability] += 1
+        if row.get("deferred"):
+            stats["deferred"] += 1
+            by_release_status["deferred"] += 1
+            continue
+        if row.get("blocks_release"):
+            stats["release_blockers"] += 1
+            by_release_status["release_blocker"] += 1
+            if exploitability == "EXPLOITABLE":
+                stats["exploitable_blockers"] += 1
+            elif exploitability == "NOT ATTACKED":
+                stats["not_attacked_blockers"] += 1
+            elif exploitability in {"UNCERTAIN", "ATTACK ERROR"}:
+                stats["uncertain_blockers"] += 1
+            continue
+        stats["evidence_only"] += 1
+        by_release_status["evidence_only"] += 1
+        if exploitability == "DEFENDED":
+            stats["defended"] += 1
+        elif exploitability == "NOT ATTACKED":
+            stats["not_attacked_evidence"] += 1
+    stats["by_exploitability"] = dict(sorted(by_exploitability.items()))
+    stats["by_release_status"] = dict(sorted(by_release_status.items()))
+    return stats
+
+
+def _demo_status_stats(
+    *,
+    expected: dict[str, Any],
+    rows: list[dict[str, Any]],
+    observed_before: dict[str, Any],
+    observed_after: dict[str, Any],
+    after_actionable_total: int,
+) -> dict[str, Any]:
+    before = observed_before.get("stats") if isinstance(observed_before.get("stats"), dict) else {}
+    after = observed_after.get("stats") if isinstance(observed_after.get("stats"), dict) else {}
+    expected_db = expected.get("db") if isinstance(expected.get("db"), dict) else {}
+    expected_attacker = expected_db.get("attacker") if isinstance(expected_db.get("attacker"), dict) else {}
+    expected_action_required = expected_db.get("action_required") if isinstance(expected_db.get("action_required"), dict) else {}
+    expected_release_blockers = _safe_int(expected_action_required.get("total"))
+    expected_exploitable = _safe_int(expected_attacker.get("exploitable"))
+    expected_defended = _safe_int(expected_attacker.get("defended"))
+    expected_raw_total = _safe_int(expected_db.get("total_signals"))
+    expected_filtered = max(0, expected_raw_total - expected_release_blockers - expected_defended)
+    contract_status = Counter(str(row.get("status") or "unknown") for row in rows)
+    contract_exploitability = Counter(str(row.get("actual_exploitability") or "UNKNOWN") for row in rows)
+    return {
+        "remediation_policy": (
+            "Reachable remediates release blockers. Defended rows remain evidence-only "
+            "unless a code change naturally removes them. Not-attacked rows are remediated "
+            "only when the database still marks them as release blockers."
+        ),
+        "expected": {
+            "raw_db_signals": expected_raw_total,
+            "release_blockers": expected_release_blockers,
+            "exploitable_blockers": expected_exploitable,
+            "not_attacked_or_exposure_blockers": max(0, expected_release_blockers - expected_exploitable),
+            "defended_evidence": expected_defended,
+            "filtered_fixture_evidence": expected_filtered,
+            "proof_target": 0,
+        },
+        "before": before,
+        "after": after,
+        "contract": {
+            "rows": len(rows),
+            "fixed": int(contract_status.get("fixed", 0) + contract_status.get("defended_after_remediation", 0)),
+            "deferred": int(contract_status.get("deferred_manual_review", 0)),
+            "still_present": int(contract_status.get("still_present", 0)),
+            "missing": int(contract_status.get("baseline_missing", 0)),
+            "by_status": dict(sorted(contract_status.items())),
+            "by_exploitability": dict(sorted(contract_exploitability.items())),
+        },
+        "final_actionable": int(after_actionable_total),
     }
 
 
@@ -1253,6 +1366,7 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
     observed = expected_demo.get("observed") if isinstance(expected_demo.get("observed"), dict) else {}
     observed_before = observed.get("before") if isinstance(observed.get("before"), dict) else {}
     observed_after = observed.get("after") if isinstance(observed.get("after"), dict) else {}
+    status_stats = expected_demo.get("stats") if isinstance(expected_demo.get("stats"), dict) else {}
     artifact_links = _artifact_links(summary.get("artifacts") or [], compliance)
     expected_status = "Clean" if expected_demo.get("clean") else "Needs review"
     baseline_meta = expected_demo.get("baseline") if isinstance(expected_demo.get("baseline"), dict) else {}
@@ -1349,16 +1463,8 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
       <h1>{html.escape(hero_title)}</h1>
       <div class="verdict"><strong>Verdict:</strong> {html.escape(hero_headline)}</div>
       <p>Public, sanitized proof for the intentionally vulnerable Reachable Go testbed. The page is built from the Reachable scan database: vulnerable baseline scan, remediation proof scan, expected issue contract, branch, commit, scan number, timestamp, and AI cost telemetry. Private prompts, rules, agent transcripts, and local databases are not published.</p>
-      <div class="cards">
-        {_card("Expected issues", str(expected_demo.get("expected_total", 0)))}
-        {_card("Found on vulnerable main", str(expected_demo.get("baseline_found", 0)))}
-        {_card("Fixed on remediation branch", str(expected_demo.get("fixed", 0)))}
-        {_card("Still present", str(expected_demo.get("still_present", 0)))}
-        {_card("Final release blockers", str(expected_demo.get("after_total") if expected_demo.get("after_total") is not None else "not run"))}
-        {_card("Remediation batches", _batch_count_label(remediation))}
-        {_card("AI cost estimate", _money(ai_economics.get("cost_usd")))}
-        {_card("AI tokens", _number(ai_economics.get("tokens_total")))}
-      </div>
+      {_status_metric_cards(expected_demo, status_stats, remediation, ai_economics)}
+      {_release_logic_panel(status_stats)}
       <div class="subgrid">
         {_proof_panel("Vulnerable baseline", baseline_meta, baseline_ai)}
         {_proof_panel("Remediated branch proof", after_meta, after_ai)}
@@ -1400,7 +1506,8 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
     </section>
     <section class="card">
       <h2 id="expected">Demo Contract: Expected Vulnerabilities Fixed</h2>
-      <p><strong>{html.escape(expected_status)}:</strong> This table is the demo contract. Each row is an expected vulnerable fixture. “Fixed” means it was present in the vulnerable baseline database and absent from the remediation proof database.</p>
+      <p><strong>{html.escape(expected_status)}:</strong> This table is the demo contract. Each row is an expected vulnerable fixture. “Fixed” means it was present in the vulnerable baseline database and absent from the remediation proof database. Defended evidence is allowed to remain only when it is still nonblocking; release blockers must be gone or explicitly deferred.</p>
+      {_contract_status_table(status_stats)}
       <table>
         <thead><tr><th>Expected issue</th><th>Risk</th><th>Reachability</th><th>Exploitability</th><th>Location</th><th>Baseline</th><th>Remediation proof</th><th>Status</th><th>Fix / evidence</th></tr></thead>
         <tbody>{expected_rows}</tbody>
@@ -1448,6 +1555,122 @@ def _render_html(*, summary: dict[str, Any], generated_at: str, page_url: str, c
 
 def _card(label: str, value: str) -> str:
     return f'<div class="card"><div class="num">{html.escape(value)}</div><div class="label">{html.escape(label)}</div></div>'
+
+
+def _status_metric_cards(
+    expected_demo: dict[str, Any],
+    stats: dict[str, Any],
+    remediation: dict[str, Any],
+    ai_economics: dict[str, Any],
+) -> str:
+    before = stats.get("before") if isinstance(stats.get("before"), dict) else {}
+    after = stats.get("after") if isinstance(stats.get("after"), dict) else {}
+    contract = stats.get("contract") if isinstance(stats.get("contract"), dict) else {}
+    expected = stats.get("expected") if isinstance(stats.get("expected"), dict) else {}
+    cards = [
+        _card("Contract rows matched", f"{_safe_int(expected_demo.get('baseline_found'))}/{_safe_int(expected_demo.get('expected_total'))}"),
+        _card("Expected release blockers", _before_after(expected.get("release_blockers"), stats.get("final_actionable"))),
+        _card("Exploitable blockers", _before_after(expected.get("exploitable_blockers"), 0)),
+        _card("Not-attacked / exposure blockers", _before_after(expected.get("not_attacked_or_exposure_blockers"), 0)),
+        _card("Defended evidence", f"{_safe_int(expected.get('defended_evidence'))} evidence"),
+        _card("Deferred manual review", str(_safe_int(contract.get("deferred") or expected_demo.get("deferred_present")))),
+        _card("Final actionable", str(_safe_int(stats.get("final_actionable") if stats else expected_demo.get("after_total")))),
+        _card("Remediation batches", _batch_count_label(remediation)),
+        _card("AI cost / tokens", f"{_money(ai_economics.get('cost_usd'))} / {_number(ai_economics.get('tokens_total'))}"),
+    ]
+    return f'<div class="cards">{"".join(cards)}</div>'
+
+
+def _release_logic_panel(stats: dict[str, Any]) -> str:
+    before = stats.get("before") if isinstance(stats.get("before"), dict) else {}
+    after = stats.get("after") if isinstance(stats.get("after"), dict) else {}
+    expected = stats.get("expected") if isinstance(stats.get("expected"), dict) else {}
+    policy = str(stats.get("remediation_policy") or "")
+    rows = [
+        (
+            "Release blockers",
+            _before_after(expected.get("release_blockers"), stats.get("final_actionable")),
+            "Yes",
+            "These rows are the remediation queue. The proof must reduce them to zero, except explicitly deferred manual-review cases.",
+        ),
+        (
+            "Exploitable blockers",
+            _before_after(expected.get("exploitable_blockers"), 0),
+            "Yes",
+            "Enzo attacker proved a reachable attack path. These are the strongest fix candidates.",
+        ),
+        (
+            "Not-attacked / exposure blockers",
+            _before_after(expected.get("not_attacked_or_exposure_blockers"), 0),
+            "Yes, when blocking",
+            "No attack proof was run or applicable, but the DB still marks the row as release-blocking, such as reachable CVEs, secret/DLP exposure, or AI-boundary authority risk.",
+        ),
+        (
+            "Defended evidence",
+            f"{_safe_int(expected.get('defended_evidence'))} evidence rows",
+            "No",
+            "Reachable found a security-shaped path, but Enzo attacker could not prove external control and impact. These rows are audit evidence, not release blockers.",
+        ),
+        (
+            "Filtered fixture evidence",
+            f"{_safe_int(expected.get('filtered_fixture_evidence'))} evidence rows",
+            "No",
+            "Synthetic not-reachable or non-production markers prove detector coverage and are excluded from the fix queue.",
+        ),
+        (
+            "Deferred",
+            _before_after(before.get("deferred"), after.get("deferred")),
+            "Manual review",
+            "A documented exception remains visible so the release owner understands what is not automatically fixed in this demo.",
+        ),
+    ]
+    body = "\n".join(
+        "<tr>"
+        f"<td>{html.escape(label)}</td>"
+        f"<td><strong>{html.escape(count)}</strong></td>"
+        f"<td>{html.escape(remediated)}</td>"
+        f"<td>{html.escape(meaning)}</td>"
+        "</tr>"
+        for label, count, remediated, meaning in rows
+    )
+    return (
+        '<div class="card">'
+        "<h2>What Gets Remediated</h2>"
+        f"<p>{html.escape(policy)}</p>"
+        "<div class=\"table-scroll\"><table>"
+        "<thead><tr><th>Category</th><th>Before → proof</th><th>Remediated?</th><th>Release-owner meaning</th></tr></thead>"
+        f"<tbody>{body}</tbody>"
+        "</table></div>"
+        "</div>"
+    )
+
+
+def _contract_status_table(stats: dict[str, Any]) -> str:
+    contract = stats.get("contract") if isinstance(stats.get("contract"), dict) else {}
+    rows = [
+        ("Resolved by remediation", contract.get("fixed"), "Expected rows found on the vulnerable baseline and gone or safely nonblocking in the proof scan."),
+        ("Deferred manual review", contract.get("deferred"), "Documented exceptions that remain visible and do not count as an automated proof failure."),
+        ("Still blocking", contract.get("still_present"), "Expected rows that would fail the proof if any remained."),
+        ("Missing from baseline", contract.get("missing"), "Expected rows that were not detected on the vulnerable baseline and would indicate a scanner/testbed mismatch."),
+    ]
+    body = "\n".join(
+        "<tr>"
+        f"<td>{html.escape(label)}</td>"
+        f"<td><strong>{_safe_int(value)}</strong></td>"
+        f"<td>{html.escape(meaning)}</td>"
+        "</tr>"
+        for label, value, meaning in rows
+    )
+    return (
+        '<div class="table-scroll"><table>'
+        '<thead><tr><th>Contract result</th><th>Rows</th><th>Meaning</th></tr></thead>'
+        f"<tbody>{body}</tbody>"
+        "</table></div>"
+    )
+
+
+def _before_after(before: Any, after: Any) -> str:
+    return f"{_safe_int(before)} → {_safe_int(after)}"
 
 
 def _batch_count_label(remediation: dict[str, Any]) -> str:
@@ -1638,6 +1861,7 @@ def _observed_scan_panel(title: str, observed: dict[str, Any]) -> str:
     if not observed:
         return '<p class="bad">Observed scan data was not available from repo.db.</p>'
     meta = observed.get("meta") if isinstance(observed.get("meta"), dict) else {}
+    stats = observed.get("stats") if isinstance(observed.get("stats"), dict) else {}
     rows = observed.get("rows") if isinstance(observed.get("rows"), list) else []
     table_rows = "\n".join(_observed_scan_row(item) for item in rows)
     if not table_rows:
@@ -1651,6 +1875,10 @@ def _observed_scan_panel(title: str, observed: dict[str, Any]) -> str:
         {_card("Raw DB findings", str(_safe_int(observed.get("db_total_findings"))))}
         {_card("Production rows listed", str(_safe_int(observed.get("production_rows"))))}
         {_card("Release blockers", str(_safe_int(observed.get("release_blockers"))))}
+        {_card("Exploitable blockers", str(_safe_int(stats.get("exploitable_blockers"))))}
+        {_card("Not-attacked blockers", str(_safe_int(stats.get("not_attacked_blockers"))))}
+        {_card("Defended evidence", str(_safe_int(stats.get("defended"))))}
+        {_card("Deferred", str(_safe_int(stats.get("deferred"))))}
       </div>
       <h3>{html.escape(title)}</h3>
       <div class="table-scroll">
