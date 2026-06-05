@@ -17,7 +17,7 @@ use this workflow:
 
 ### Which Action Do I Run?
 
-| Action shown in GitHub | Customer meaning | Run manually? |
+| Action shown in GitHub | Meaning | Run manually? |
 |------------------------|------------------|---------------|
 | `Run Demo` | Scan the vulnerable release candidate, create a fix branch, test it, rescan it, open a PR, and publish the verdict status page. | Yes |
 | `Reset Demo` | Delete old `reachable-remediate-*` demo branches before a fresh run. | Optional |
