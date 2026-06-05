@@ -62,7 +62,7 @@ on:
       create_pr:
         description: "Open a pull request after successful remediation"
         type: boolean
-        default: true
+        default: false
       run_project_tests:
         description: "Run the repository test command after agent edits before proof scans"
         type: boolean
