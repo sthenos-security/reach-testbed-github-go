@@ -197,7 +197,8 @@ Current golden baseline:
 | DB evidence rows used in public proof | 21 |
 | Families | CVE, CWE, secret, DLP, AI |
 | Grouped expected findings | 17 grouped findings covering 28 raw DB signals. |
-| Release blockers after remediation | 0 |
+| Release blockers after remediation | 0 non-deferred blockers |
+| Deferred demo case | `GO-CWE-01` / `CWE/78` at `internal/handlers/cwe.go:12`; kept in the scanner contract, skipped from autonomous-remediation proof until the agent prompt is tightened. |
 | Residual post-fix findings | Only filtered `NON_PROD` or `NOT_REACHABLE` fixture markers may remain in the database. |
 
 The testbed itself is the contract. Do not edit the vulnerable fixture or the

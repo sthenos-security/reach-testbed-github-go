@@ -178,11 +178,12 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
 
     expected = _load_json_required(expected_path)
     expected_rows = [_expected_row(tuple(item)) for item in ((expected.get("sarif") or {}).get("results") or [])]
+    deferred_rows = _deferred_expected_rows(expected)
     baseline_ctx = _scan_db_context(artifact_dir / "reports" / "baseline" / "scan-path.txt")
     after_ctx = _scan_db_context(artifact_dir / "reports" / "after-final" / "scan-path.txt")
     baseline_rows = _db_expected_row_map(baseline_ctx)
     after_rows = _db_expected_row_map(after_ctx)
-    after_actionable_total = _db_actionable_count(after_ctx)
+    after_actionable_total = _db_actionable_count(after_ctx, deferred_keys=set(deferred_rows))
     baseline_ai = _db_ai_usage_summary(baseline_ctx)
     after_ai = _db_ai_usage_summary(after_ctx)
 
@@ -190,9 +191,11 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
     baseline_found = 0
     fixed = 0
     still_present = 0
+    deferred_present = 0
     missing = 0
     for row in expected_rows:
         key = row["match_key"]
+        deferred = deferred_rows.get(key)
         before_items = baseline_rows.get(key, [])
         after_items = after_rows.get(key, [])
         found_before = bool(before_items)
@@ -212,6 +215,10 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
             fixed += 1
             status = "defended_after_remediation"
             status_label = "Resolved - residual row is defended"
+        elif blocking_after and deferred:
+            deferred_present += 1
+            status = "deferred_manual_review"
+            status_label = "Deferred - manual review"
         elif blocking_after:
             still_present += 1
             status = "still_present"
@@ -231,6 +238,8 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
                 "found_before": found_before,
                 "found_after": found_after,
                 "blocking_after": blocking_after,
+                "deferred": bool(deferred),
+                "deferred_reason": (deferred or {}).get("reason", ""),
                 "status": status,
                 "status_label": status_label,
                 "baseline_signal": _public_signal(baseline_signal),
@@ -246,7 +255,9 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
 
     expected_total = len(expected_rows)
     clean = baseline_found == expected_total and still_present == 0 and after_actionable_total == 0
-    if clean and baseline_found == expected_total:
+    if clean and deferred_present:
+        headline = "All non-deferred demo vulnerabilities were fixed; one documented case is deferred for manual review."
+    elif clean and baseline_found == expected_total:
         headline = "All expected demo vulnerabilities were found and the remediation branch has no blocking findings."
     elif still_present == 0:
         headline = "The remediation proof scan has no blocking findings, but the baseline contract did not fully match."
@@ -262,6 +273,7 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
         "baseline_missing": missing,
         "fixed": fixed,
         "still_present": still_present,
+        "deferred_present": deferred_present,
         "after_available": True,
         "after_total": after_actionable_total,
         "clean": clean,
@@ -278,6 +290,16 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
         },
         "evidence_source": "repo.db",
     }
+
+
+def _deferred_expected_rows(expected: dict[str, Any]) -> dict[tuple[str, str, int], dict[str, Any]]:
+    deferred: dict[tuple[str, str, int], dict[str, Any]] = {}
+    for item in expected.get("deferred_remediation") or []:
+        if not isinstance(item, dict):
+            continue
+        key = _expected_match_key(item.get("rule"), item.get("path"), item.get("line") or 0)
+        deferred[key] = item
+    return deferred
 
 
 def _copy_cache_evidence(artifact_dir: Path, out_dir: Path) -> dict[str, Any]:
@@ -448,7 +470,8 @@ def _public_signal(row: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in public.items() if value not in (None, "")}
 
 
-def _db_actionable_count(ctx: dict[str, Any]) -> int:
+def _db_actionable_count(ctx: dict[str, Any], *, deferred_keys: set[tuple[str, str, int]] | None = None) -> int:
+    deferred_keys = deferred_keys or set()
     conn = sqlite3.connect(Path(ctx["db_path"]))
     conn.row_factory = sqlite3.Row
     scan_id = int(ctx["scan_id"])
@@ -472,9 +495,15 @@ def _db_actionable_count(ctx: dict[str, Any]) -> int:
         row["normalized_path"] = path
         row["line_number"] = line
         row["attacker"] = attacker.get((_db_family(row), path, line), {})
-        if _signal_blocks_remediation(row):
+        if _signal_blocks_remediation(row) and not _row_matches_deferred(row, deferred_keys):
             count += 1
     return count
+
+
+def _row_matches_deferred(row: dict[str, Any], deferred_keys: set[tuple[str, str, int]]) -> bool:
+    if not deferred_keys:
+        return False
+    return any(key in deferred_keys for key in _db_match_keys(row))
 
 
 def _db_ai_usage_summary(ctx: dict[str, Any]) -> dict[str, Any]:
@@ -1623,7 +1652,13 @@ def _issue_row(item: dict[str, str]) -> str:
 def _expected_demo_row(item: dict[str, Any]) -> str:
     status = str(item.get("status") or "")
     status_label = str(item.get("status_label") or status)
-    status_class = "reachable" if status == "fixed" else "warning" if status in {"still_present", "baseline_missing"} else ""
+    status_class = (
+        "reachable"
+        if status == "fixed"
+        else "warning"
+        if status in {"still_present", "baseline_missing", "deferred_manual_review"}
+        else ""
+    )
     baseline = "Found" if item.get("found_before") else "Missing"
     after = "Still reported" if item.get("found_after") else "Not reported"
     actual_risk = str(item.get("actual_risk") or item.get("expected_risk") or "")
@@ -1632,6 +1667,8 @@ def _expected_demo_row(item: dict[str, Any]) -> str:
     title = str(item.get("signal_title") or item.get("kind") or "Security finding")
     details = str(item.get("signal_description") or "")
     remediation_action = str(item.get("remediation_action") or _expected_business_value(item))
+    if item.get("deferred") and item.get("deferred_reason"):
+        remediation_action = f"Deferred for this demo: {item.get('deferred_reason')}"
     problem_ref = str(item.get("problem_ref") or "expected-results.html#expected-findings-table")
     detail_html = ""
     if details:

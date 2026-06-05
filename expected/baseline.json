@@ -7,7 +7,21 @@
     "All secrets and PII are synthetic.",
     "DB signals are scanner truth, including filtered rows.",
     "SARIF rows are a compatibility export derived from DB-selected production evidence.",
-    "EXPLOITABLE rows must come from Enzo attacker evidence."
+    "EXPLOITABLE rows must come from Enzo attacker evidence.",
+    "GO-CWE-01 is temporarily deferred from the autonomous remediation proof because the current coding-agent loop leaves DiagnosticPing unchanged when SafeDiagnosticPing already exists. The scanner must still detect it on the vulnerable baseline."
+  ],
+  "deferred_remediation": [
+    {
+      "rule": "CWE/78",
+      "reachability": "exploitable",
+      "risk": "CRITICAL",
+      "prod_status": "PRODUCTION",
+      "path": "internal/handlers/cwe.go",
+      "line": 12,
+      "id": "GO-CWE-01",
+      "title": "Command injection in DiagnosticPing host parameter",
+      "reason": "Deferred for the demo while reach-core remediation prompts are tightened: the agent must modify DiagnosticPing itself, not rely on the existing SafeDiagnosticPing sibling."
+    }
   ],
   "db": {
     "total_signals": 28,

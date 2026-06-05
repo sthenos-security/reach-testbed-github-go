@@ -30,6 +30,11 @@ def main() -> int:
         for row in verdict.get("rows", [])
         if row.get("status") in {"still_present", "baseline_missing"}
     ]
+    deferred_rows = [
+        row
+        for row in verdict.get("rows", [])
+        if row.get("status") == "deferred_manual_review"
+    ]
     payload = {
         "source": "repo.db",
         "clean": bool(verdict.get("clean")),
@@ -39,6 +44,7 @@ def main() -> int:
         "baseline_missing": verdict.get("baseline_missing", 0),
         "fixed": verdict.get("fixed", 0),
         "still_present": verdict.get("still_present", 0),
+        "deferred_present": verdict.get("deferred_present", 0),
         "after_blocking_total": verdict.get("after_total", 0),
         "baseline_scan": verdict.get("baseline", {}),
         "after_scan": verdict.get("after", {}),
@@ -53,6 +59,18 @@ def main() -> int:
             }
             for row in blocking_rows
         ],
+        "deferred_rows": [
+            {
+                "rule_id": row.get("rule_id"),
+                "location": row.get("location"),
+                "status": row.get("status"),
+                "status_label": row.get("status_label"),
+                "reason": row.get("deferred_reason"),
+                "risk": row.get("actual_risk") or row.get("expected_risk"),
+                "reachability": row.get("actual_reachability") or row.get("expected_reachability"),
+            }
+            for row in deferred_rows
+        ],
     }
     out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Reachable DB remediation verdict: {payload['headline']}")
@@ -62,11 +80,17 @@ def main() -> int:
         f"baseline_found={payload['baseline_found']} "
         f"fixed={payload['fixed']} "
         f"still_present={payload['still_present']} "
+        f"deferred={payload['deferred_present']} "
         f"after_blocking={payload['after_blocking_total']}"
     )
     print(f"Reachable DB baseline scan: {payload['baseline_scan'].get('db_scan_id')} @ {payload['baseline_scan'].get('commit_short')}")
     print(f"Reachable DB proof scan: {payload['after_scan'].get('db_scan_id')} @ {payload['after_scan'].get('commit_short')}")
     if payload["clean"]:
+        for row in payload["deferred_rows"]:
+            print(
+                "DB proof deferred: "
+                f"{row.get('rule_id')} {row.get('status_label')} at {row.get('location')} — {row.get('reason')}"
+            )
         return 0
     for row in payload["blocking_rows"]:
         print(
