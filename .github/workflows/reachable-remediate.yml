@@ -75,6 +75,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
   security-events: write
   actions: write
   pages: write
