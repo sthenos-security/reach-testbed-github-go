@@ -16,8 +16,6 @@ jobs:
       pull-requests: write
       issues: write
       actions: write
-    env:
-      GH_TOKEN: ${{ secrets.CI_PR_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -47,47 +45,47 @@ jobs:
           echo "DIAGNOSTIC_BRANCH=$branch" >> "$GITHUB_ENV"
 
       - name: Create diagnostic PR
+        env:
+          WORKFLOW_TOKEN: ${{ github.token }}
+          CI_PR_TOKEN: ${{ secrets.CI_PR_TOKEN }}
+          BASE_BRANCH: main
         run: |
           set -euo pipefail
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::error::CI_PR_TOKEN is not configured."
-            exit 1
-          fi
-          unset GITHUB_TOKEN
-          echo "CI_PR_TOKEN present: yes"
-          echo "CI_PR_TOKEN length: ${#GH_TOKEN}"
-          case "$GH_TOKEN" in
-            github_pat_*) echo "CI_PR_TOKEN prefix check: github_pat_ matched" ;;
-            *) echo "::error::CI_PR_TOKEN does not start with github_pat_"; exit 1 ;;
-          esac
-          case "$GH_TOKEN" in
-            github_pat_11B3AD7IA0F*) echo "CI_PR_TOKEN expected prefix check: matched" ;;
-            *) echo "::error::CI_PR_TOKEN expected prefix check failed"; exit 1 ;;
-          esac
-          echo "Testing PR creation with CI_PR_TOKEN through gh pr create."
-          echo "gh auth status:"
-          gh auth status || true
-          echo "CI_PR_TOKEN identity:"
-          gh api user --jq '{login: .login, type: .type}'
-          echo "CI_PR_TOKEN repository permissions:"
-          gh api "repos/${GITHUB_REPOSITORY}" --jq '{permissions: .permissions, role_name: .role_name}'
-          echo "CI_PR_TOKEN repo workflow permissions:"
-          gh api "/repos/${GITHUB_REPOSITORY}/actions/permissions/workflow"
-          echo "CI_PR_TOKEN org workflow permissions:"
-          gh api "/orgs/${GITHUB_REPOSITORY_OWNER}/actions/permissions/workflow"
-          set +e
-          pr_output="$(gh pr create \
-            --base main \
-            --head "${DIAGNOSTIC_BRANCH}" \
-            --title "Diagnostic PR permission test" \
-            --body "This PR was created by the Debug PR Permissions workflow using the configured PR token." 2>&1)"
-          pr_status="$?"
-          set -e
 
-          if [ "$pr_status" -ne 0 ]; then
-            echo "gh pr create failed; trying REST create-pull-request fallback."
+          create_with_token() {
+            local label="$1"
+            local token="$2"
+            if [ -z "$token" ]; then
+              echo "${label}: token not configured."
+              return 1
+            fi
+
+            export GH_TOKEN="$token"
+            unset GITHUB_TOKEN
+            echo "Testing PR creation with ${label}."
+            gh auth status || true
+            echo "${label} repo workflow permissions:"
+            gh api "/repos/${GITHUB_REPOSITORY}/actions/permissions/workflow" \
+              --jq '{default_workflow_permissions, can_approve_pull_request_reviews}' || true
+
+            set +e
+            pr_output="$(gh pr create \
+              --base "${BASE_BRANCH}" \
+              --head "${DIAGNOSTIC_BRANCH}" \
+              --title "Diagnostic PR permission test" \
+              --body "This PR was created by the Debug PR Permissions workflow using ${label}." 2>&1)"
+            pr_status="$?"
+            set -e
+
+            if [ "$pr_status" -eq 0 ]; then
+              printf '%s\n' "$pr_output"
+              gh pr view "$DIAGNOSTIC_BRANCH" --json number --jq .number
+              return 0
+            fi
+
+            echo "${label}: gh pr create failed; trying REST create-pull-request fallback."
             printf '%s\n' "$pr_output"
-            payload="$(python3 -c 'import json, os; print(json.dumps({"title": "Diagnostic PR permission test", "head": os.environ["DIAGNOSTIC_BRANCH"], "base": "main", "body": "This PR was created by the Debug PR Permissions workflow using the REST fallback."}))')"
+            payload="$(python3 -c 'import json, os; print(json.dumps({"title": "Diagnostic PR permission test", "head": os.environ["DIAGNOSTIC_BRANCH"], "base": os.environ["BASE_BRANCH"], "body": "This PR was created by the Debug PR Permissions workflow REST fallback."}))')"
             response="$(mktemp)"
             status="$(curl -sS -D "$response.headers" -o "$response" -w "%{http_code}" \
               -X POST \
@@ -96,15 +94,27 @@ jobs:
               -H "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls" \
               --data "$payload")"
-            echo "REST PR create HTTP status: $status"
+            echo "${label}: REST PR create HTTP status: $status"
             grep -i '^x-accepted-github-permissions:' "$response.headers" || true
             cat "$response"
-            test "$status" = "201"
-            pr_number="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["number"])' "$response")"
+            if [ "$status" = "201" ]; then
+              python3 -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["number"])' "$response"
+              return 0
+            fi
+            return 1
+          }
+
+          pr_number_file="$(mktemp)"
+          if create_with_token "GITHUB_TOKEN" "$WORKFLOW_TOKEN" | tee "$pr_number_file"; then
+            :
+          elif create_with_token "CI_PR_TOKEN" "${CI_PR_TOKEN:-}" | tee "$pr_number_file"; then
+            :
           else
-            printf '%s\n' "$pr_output"
-            pr_number="$(gh pr view "$DIAGNOSTIC_BRANCH" --json number --jq .number)"
+            echo "::error::PR creation failed with GITHUB_TOKEN and CI_PR_TOKEN."
+            exit 1
           fi
+          pr_number="$(tail -n1 "$pr_number_file")"
+
           echo "DIAGNOSTIC_PR_NUMBER=$pr_number" >> "$GITHUB_ENV"
           echo "Created diagnostic PR #$pr_number"
 
