@@ -71,6 +71,10 @@ jobs:
           gh api user --jq '{login: .login, type: .type}'
           echo "CI_PR_TOKEN repository permissions:"
           gh api "repos/${GITHUB_REPOSITORY}" --jq '{permissions: .permissions, role_name: .role_name}'
+          echo "CI_PR_TOKEN repo workflow permissions:"
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/permissions/workflow"
+          echo "CI_PR_TOKEN org workflow permissions:"
+          gh api "/orgs/${GITHUB_REPOSITORY_OWNER}/actions/permissions/workflow"
           set +e
           pr_output="$(gh pr create \
             --base main \
