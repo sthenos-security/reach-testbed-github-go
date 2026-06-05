@@ -615,13 +615,7 @@ jobs:
             exit 1
           fi
           git commit -m "fix: reachable remediation batch"
-          push_token="${REACHABLE_GITHUB_TOKEN:-${GH_TOKEN:-}}"
-          if [ -n "$push_token" ]; then
-            git remote set-url origin "https://x-access-token:${push_token}@github.com/${GITHUB_REPOSITORY}.git"
-            echo "Pushing remediation branch with configured GitHub token."
-          else
-            echo "Pushing remediation branch with checkout credentials."
-          fi
+          echo "Pushing remediation branch with workflow GITHUB_TOKEN checkout credentials."
           git push origin "$REACHABLE_REMEDIATION_BRANCH"
 
       - name: Open remediation PR
