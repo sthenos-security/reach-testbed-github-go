@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       branch_prefix:
-        description: "Remote branch prefix to delete"
+        description: "Comma-separated remote branch prefixes to delete"
         type: string
-        default: reachable-remediate-
+        default: "reachable-remediate-,ci-pr-permission-test-,codex/"
       dry_run:
         description: "List matching branches without deleting them"
         type: boolean
@@ -45,21 +45,30 @@ jobs:
         run: |
           set -euo pipefail
 
-          prefix="${BRANCH_PREFIX:-reachable-remediate-}"
-          if [ -z "$prefix" ]; then
+          raw_prefixes="${BRANCH_PREFIX:-reachable-remediate-,ci-pr-permission-test-,codex/}"
+          if [ -z "$raw_prefixes" ]; then
             echo "branch_prefix cannot be empty." >&2
             exit 2
           fi
-          if [ "$prefix" = "main" ] || [ "$prefix" = "master" ]; then
-            echo "Refusing unsafe branch_prefix=$prefix." >&2
-            exit 2
-          fi
 
-          mapfile -t branches < <(
+          IFS=',' read -ra prefixes <<< "$raw_prefixes"
+          branches_tmp="$(mktemp)"
+          : > "$branches_tmp"
+          for prefix in "${prefixes[@]}"; do
+            prefix="$(echo "$prefix" | xargs)"
+            if [ -z "$prefix" ]; then
+              continue
+            fi
+            case "$prefix" in
+              main|main/*|master|master/*)
+                echo "Refusing unsafe branch_prefix=$prefix." >&2
+                exit 2
+                ;;
+            esac
             git ls-remote --heads origin "${prefix}*" |
-              awk '{sub("refs/heads/","",$2); print $2}' |
-              sort
-          )
+              awk '{sub("refs/heads/","",$2); print $2}' >> "$branches_tmp"
+          done
+          mapfile -t branches < <(sort -u "$branches_tmp")
 
           mapfile -t open_pr_heads < <(
             gh pr list --state open --json headRefName --jq '.[].headRefName' |
@@ -84,7 +93,7 @@ jobs:
           {
             echo "## Reachable Demo Branch Cleanup"
             echo ""
-            echo "- Prefix: \`$prefix\`"
+            echo "- Prefixes: \`$raw_prefixes\`"
             echo "- Dry run: \`$DRY_RUN\`"
             echo "- Delete open PR branches: \`$DELETE_OPEN_PR_BRANCHES\`"
             echo "- Matching remote branches: \`$matched\`"
@@ -92,8 +101,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$matched" -eq 0 ]; then
-            echo "No remote branches match prefix '$prefix'."
-            echo "No remote branches match prefix \`$prefix\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "No remote branches match prefixes '$raw_prefixes'."
+            echo "No remote branches match prefixes \`$raw_prefixes\`." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 

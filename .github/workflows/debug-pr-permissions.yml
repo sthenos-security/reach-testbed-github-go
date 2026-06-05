@@ -76,5 +76,31 @@ jobs:
             --data "$payload")"
           echo "PR create HTTP status: $status"
           cat "$response"
+          if [ "$status" = "201" ]; then
+            pr_number="$(python3 - "$response" <<'PY'
+            import json
+            import sys
+            print(json.load(open(sys.argv[1], encoding="utf-8"))["number"])
+            PY
+            )"
+            echo "DIAGNOSTIC_PR_NUMBER=$pr_number" >> "$GITHUB_ENV"
+            echo "Created diagnostic PR #$pr_number"
+          fi
           test "$status" = "201"
 
+      - name: Cleanup diagnostic PR and branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${DIAGNOSTIC_PR_NUMBER:-}" ]; then
+            echo "Closing diagnostic PR #${DIAGNOSTIC_PR_NUMBER}."
+            gh pr close "${DIAGNOSTIC_PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --comment "Closing diagnostic PR permission test." || true
+          fi
+
+          if [ -n "${DIAGNOSTIC_BRANCH:-}" ]; then
+            echo "Deleting diagnostic branch ${DIAGNOSTIC_BRANCH}."
+            git push origin --delete "${DIAGNOSTIC_BRANCH}" || true
+          fi
