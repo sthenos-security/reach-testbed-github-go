@@ -116,7 +116,11 @@ jobs:
       # Keep this short so a stuck coding-agent CLI cannot hold the customer
       # demo past the expected workflow window. Repositories can override with
       # the REACHABLE_AGENT_TIMEOUT_SECONDS variable for larger codebases.
-      REACHABLE_AGENT_TIMEOUT_SECONDS: ${{ vars.REACHABLE_AGENT_TIMEOUT_SECONDS || '300' }}
+      REACHABLE_AGENT_TIMEOUT_SECONDS: ${{ vars.REACHABLE_AGENT_TIMEOUT_SECONDS || '480' }}
+      # Overall wall-clock budget for the serialized remediation loop. Each
+      # batch receives only the remaining loop time, so the demo cannot keep
+      # spinning across batches after the budget is exhausted.
+      REACHABLE_REMEDIATION_LOOP_TIMEOUT_SECONDS: ${{ vars.REACHABLE_REMEDIATION_LOOP_TIMEOUT_SECONDS || '900' }}
       # Same guardrail for Reachable's remediation-bundle synthesis. This runs
       # before the coding agent, so it needs its own timeout.
       REACHABLE_REMEDIATE_TIMEOUT_SECONDS: ${{ vars.REACHABLE_REMEDIATE_TIMEOUT_SECONDS || '120' }}
@@ -463,8 +467,16 @@ jobs:
           fi
           # shellcheck disable=SC2206
           extra_args=($REACHABLE_SCAN_EXTRA_FLAGS)
+          loop_budget="${REACHABLE_REMEDIATION_LOOP_TIMEOUT_SECONDS:-900}"
+          loop_deadline="$(($(date +%s) + loop_budget))"
+          echo "Reachable remediation loop timeout: ${loop_budget}s"
 
           for batch in $(seq 1 "$max_batches"); do
+            loop_remaining="$((loop_deadline - $(date +%s)))"
+            if [ "$loop_remaining" -le 0 ]; then
+              echo "Reachable remediation loop budget exhausted before batch $batch; stopping so the DB proof gate can publish evidence." >&2
+              break
+            fi
             echo "== Reachable remediation batch $batch/$max_batches =="
             rm -rf .reachable/remediation-bundle
 
@@ -512,8 +524,18 @@ jobs:
 
             mkdir -p "${REACHABLE_AGENT_LOG_DIR:-.reachable/private-agent-logs}"
             agent_log="${REACHABLE_AGENT_LOG_DIR:-.reachable/private-agent-logs}/agent-batch-${batch}.log"
-            agent_timeout="${REACHABLE_AGENT_TIMEOUT_SECONDS:-600}"
-            echo "Coding agent timeout for batch $batch: ${agent_timeout}s"
+            agent_cap="${REACHABLE_AGENT_TIMEOUT_SECONDS:-300}"
+            loop_remaining="$((loop_deadline - $(date +%s)))"
+            if [ "$loop_remaining" -le 0 ]; then
+              echo "Reachable remediation loop budget exhausted before coding agent batch $batch." >&2
+              exit 124
+            fi
+            if [ "$agent_cap" -gt "$loop_remaining" ]; then
+              agent_timeout="$loop_remaining"
+            else
+              agent_timeout="$agent_cap"
+            fi
+            echo "Coding agent timeout for batch $batch: ${agent_timeout}s (loop remaining ${loop_remaining}s, cap ${agent_cap}s)"
             set +e
             timeout --foreground "${agent_timeout}s" ./ci/run-agent.sh "$REACHABLE_AGENT" .reachable/remediation-bundle/prompt.md > "$agent_log" 2>&1
             agent_status="$?"
