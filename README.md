@@ -46,25 +46,25 @@ proof is clean, open a PR, and publish the verdict page.
 | `rescan_strategy` | `each_batch` | Rescan after each bounded patch batch so CI can stop once release blockers are gone. |
 | `require_ai` | `true` | Fail fast if the selected AI key is missing, instead of producing a confusing partial run. |
 | `fresh_scan` | `false` | Reuse the Reachable cache for speed. Set `true` only when you intentionally want a clean no-cache evidence run. |
-| `create_pr` | `false` | Push the remediation branch and publish proof. The release manager opens the PR manually from `reachable-remediate-*`. |
+| `create_pr` | `true` | Open a remediation PR from the pushed `reachable-remediate-*` branch after the DB proof passes. Set `false` to use branch-only/manual PR mode. |
 | `run_project_tests` | `true` | Run `go test ./...` after the patch, before the security proof scan. |
 
 Expected result: the workflow creates a `reachable-remediate-*` branch, runs
-the project test gate, rescans that branch, and publishes the proof page. The
-proof page displays the remediation branch name. Create the PR manually from
-that branch after the run passes.
+the project test gate, rescans that branch, publishes the proof page, and opens
+a pull request for review. The proof page displays the remediation branch name,
+commit, scan IDs, and PR link when GitHub accepts automatic PR creation.
 
 Automatic PR creation is controlled by CI permissions, not by Reachable scanner
 tokens. Branch push, artifact upload, Pages publishing, and SARIF upload use the
-built-in `GITHUB_TOKEN`. Optional PR creation uses `CI_PR_TOKEN`, a repository
-secret containing a GitHub PAT with Contents and Pull requests set to read and
-write. Branch protection and review policy still decide whether anything can
-merge.
+built-in `GITHUB_TOKEN`. PR creation also uses `GITHUB_TOKEN` first; an optional
+`CI_PR_TOKEN` can be configured only as a fallback. Branch protection and review
+policy still decide whether anything can merge.
 
 ### Manual PR Fallback
 
-Use this if the workflow publishes a clean proof page and pushes the
-`reachable-remediate-<run_id>` branch, but GitHub blocks automatic PR creation.
+Use this only if `create_pr=false`, or if GitHub blocks automatic PR creation
+after the workflow publishes a clean proof page and pushes the
+`reachable-remediate-<run_id>` branch.
 
 1. Open the repository [Branches page](https://github.com/sthenos-security/reach-testbed-go/branches).
 2. Find the latest `reachable-remediate-<run_id>` branch from the successful `Run Demo` log or verdict page.
@@ -153,7 +153,7 @@ GitHub Actions:
 |----------|--------|
 | What is this repo? | A controlled vulnerable Go application used to demonstrate Reachable CI scanning, autonomous remediation, and DB-backed proof that a remediation branch is clean. |
 | What do I configure? | Add one AI key as a repository secret: `OPENAI_API_KEY` for `codex-openai` / Codex (OpenAI), or `ANTHROPIC_API_KEY` for `claude-anthropic` / Claude Code (Anthropic). Optional workflow inputs are listed below. |
-| How does the PR open? | The demo default is manual PR creation. After a successful run, open a PR from the published `reachable-remediate-*` branch. Branch protection and reviews still control merge. |
+| How does the PR open? | The demo default is automatic PR creation with the workflow `GITHUB_TOKEN`. Set `create_pr=false` to publish proof and open the PR manually from the `reachable-remediate-*` branch. Branch protection and reviews still control merge. |
 | Where is the CI pipeline? | [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml). That workflow scans, optionally remediates, rescans, verifies the DB proof, and publishes sanitized evidence. |
 | Where do I run it? | GitHub Actions → [Run Demo](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate.yml). |
 | Where are the verdict and artifacts? | [Public verdict status page](https://sthenos-security.github.io/reach-testbed-go/) and [published artifacts](https://sthenos-security.github.io/reach-testbed-go/#artifacts). |

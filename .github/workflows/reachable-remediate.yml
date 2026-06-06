@@ -279,7 +279,7 @@ jobs:
           echo "  remediation mode: ${REACHABLE_REMEDIATION_MODE}"
           echo "  selected scan provider: ${REACHABLE_LLM_PROVIDER_LABEL:-$REACHABLE_LLM_PROVIDER}"
           echo "  workflow GITHUB_TOKEN: present (checkout, branch push, Pages, SARIF)"
-          echo "  CI_PR_TOKEN configured: $([ -n "${CI_PR_TOKEN:-}" ] && echo yes || echo no) (PR creation only)"
+          echo "  CI_PR_TOKEN configured: $([ -n "${CI_PR_TOKEN:-}" ] && echo yes || echo no) (optional PR creation fallback)"
           echo "  REACHABLE_GITHUB_TOKEN configured: $([ -n "${REACHABLE_GITHUB_TOKEN:-}" ] && echo yes || echo no) (Reachable GitHub enrichment only)"
           echo "  MCP_GITHUB_TOKEN configured: $([ -n "${MCP_GITHUB_TOKEN:-}" ] && echo yes || echo no) (MCP context only)"
           echo "  OPENAI_API_KEY configured: $([ "$has_openai" -eq 1 ] && echo yes || echo no)"
