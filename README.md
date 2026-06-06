@@ -1,9 +1,12 @@
 # reach-testbed-go
 
-Intentionally vulnerable Go fixture repository for demonstrating Reachable
-CI/CD scanning, agentic remediation, and DB-backed post-fix proof.
+**Intentionally vulnerable testbed. Not for production use.**
 
-> Do not deploy this application. It contains synthetic security issues for
+This repository is a controlled Go fixture for demonstrating Reachable CI/CD
+scanning, agentic remediation, and DB-backed post-fix proof.
+
+> Do not deploy, fork as an application template, or reuse this code in a
+> production service. The vulnerabilities are deliberate synthetic fixtures for
 > scanner validation and controlled demos only.
 
 ![Reachable CI remediation flow](docs/remediation-flow.svg)

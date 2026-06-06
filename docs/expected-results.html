@@ -99,6 +99,19 @@
       border-color: var(--teal);
       color: var(--teal);
     }
+    .safety-banner {
+      border: 1px solid rgba(245, 197, 66, 0.55);
+      border-radius: 8px;
+      background: rgba(245, 197, 66, 0.10);
+      color: #ffe59a;
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.45;
+      padding: 12px 14px;
+    }
+    .safety-banner strong {
+      color: #fff3c4;
+    }
     .eyebrow {
       color: var(--muted);
       font-size: 12px;
@@ -212,6 +225,11 @@
     <header>
       <div class="brand">Reachable demo based on Go testbed</div>
       <h1>Go Testbed Expected Results</h1>
+      <div class="safety-banner">
+        <strong>Intentionally vulnerable testbed.</strong>
+        This repository is for Reachable scanner validation and controlled demos
+        only. Do not deploy or reuse it as production application code.
+      </div>
       <p>
         A compact demo for CI scanning and agent-driven remediation.
         It proves that Reachable can identify the release-blocking queue from
