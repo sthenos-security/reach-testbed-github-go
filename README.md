@@ -5,6 +5,8 @@
 This repository is a controlled Go fixture for demonstrating Reachable CI/CD
 scanning, agentic remediation, and DB-backed post-fix proof.
 
+For product and company information, see [sthenosec.com](https://sthenosec.com/).
+
 > Do not deploy, fork as an application template, or reuse this code in a
 > production service. The vulnerabilities are deliberate synthetic fixtures for
 > scanner validation and controlled demos only.
@@ -13,25 +15,27 @@ scanning, agentic remediation, and DB-backed post-fix proof.
 
 ## Release Manager Demo Runbook
 
-The diagram above is the release-gate flow. To run that flow in GitHub Actions,
-use this workflow:
+The diagram above is the release-gate flow. GitHub exposes two explicit demo
+workflows so the provider lane is obvious in the Actions UI:
 
-[GitHub Actions → Run Demo](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate.yml)
+- [GitHub Actions → Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate.yml)
+- [GitHub Actions → Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate-claude.yml)
 
 ### Which Action Do I Run?
 
 | Action shown in GitHub | Meaning | Run manually? |
 |------------------------|------------------|---------------|
-| `Run Demo` | Scan the vulnerable release candidate, create a fix branch, test it, rescan it, open or prepare a PR, and publish the verdict status page. | Yes |
+| `Run Demo (Codex)` | Scan the vulnerable release candidate, create a fix branch, test it, rescan it, open or prepare a PR, and publish the verdict status page with the Codex/OpenAI lane. | Yes |
+| `Run Demo (Claude)` | Run the same remediation demo with the Claude/Anthropic lane so GitHub clearly shows support for both providers. | Yes |
 | `Reset Demo` | Delete old `reachable-remediate-*` demo branches before a fresh run. | Optional |
 | `pages-build-deployment` | Publish Verdict Status Page. This is GitHub Pages plumbing created automatically after `Run Demo` publishes results. | No |
 
 ### Run A Full Fix Demo
 
-Click **Run workflow** and leave the defaults selected. The defaults run the
-full release-gate demo: scan `main`, create a remediation branch, run the
-agent, run project tests, rescan after each bounded batch, stop when the DB
-proof is clean, open a PR, and publish the verdict page.
+Click **Run workflow** on either provider lane and leave the defaults selected.
+The defaults run the full release-gate demo: scan `main`, create a remediation
+branch, run the agent, run project tests, rescan after each bounded batch, stop
+when the DB proof is clean, open a PR, and publish the verdict page.
 
 | Control | Demo value | Release-manager meaning |
 |---------|------------|-------------------------|
@@ -39,7 +43,7 @@ proof is clean, open a PR, and publish the verdict page.
 | `remediate` | `true` | Let CI create a fix branch and apply a bounded patch. |
 | `rescan_only` | `false` | Run the full release-gate loop: scan baseline, patch branch, run tests, rescan proof, publish evidence. |
 | `target_branch` | `main` | The branch being evaluated as the release candidate. |
-| `remediation_mode` | `codex-openai` | Uses Codex with `OPENAI_API_KEY`. Use `claude-anthropic` only when validating Claude Code with `ANTHROPIC_API_KEY`. |
+| `remediation_mode` | workflow-specific | `Run Demo (Codex)` uses `codex-openai` with `OPENAI_API_KEY`. `Run Demo (Claude)` uses `claude-anthropic` with `ANTHROPIC_API_KEY`. |
 | `prompt_profile` | `balanced` | Keeps fixes scoped: enough context to repair the issue queue without turning the run into an open-ended refactor. |
 | `signal_types` | `all` | Covers all demo blocker classes: CVE, CWE, secret, DLP, and AI findings. |
 | `max_batches` | `5` | Upper bound for serialized fix batches. The workflow stops early as soon as the DB proof is clean. |
@@ -124,13 +128,16 @@ release blockers, and publishes proof for that branch.
 
 | Workflow | Purpose |
 |----------|---------|
-| `Run Demo` | Main demo workflow. Run this to show the release-gate loop. |
+| `Run Demo (Codex)` | Main GitHub Codex demo workflow. |
+| `Run Demo (Claude)` | Main GitHub Claude demo workflow. |
 | `Reset Demo` | Deletes old `reachable-remediate-*` branches when resetting the demo. Use `dry_run=true` first if you want to preview. |
 | `pages-build-deployment` | Publish Verdict Status Page. This is GitHub Pages plumbing. Do not run it manually; it appears after `Run Demo` publishes results. |
 
 ### CI Helper Scripts
 
-The workflow code is [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml).
+The workflow code is [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml)
+for Codex and [.github/workflows/reachable-remediate-claude.yml](.github/workflows/reachable-remediate-claude.yml)
+for Claude.
 These helper scripts keep the release-gate logic auditable and testable outside
 GitHub Actions:
 
@@ -154,8 +161,8 @@ GitHub Actions:
 | What is this repo? | A controlled vulnerable Go application used to demonstrate Reachable CI scanning, autonomous remediation, and DB-backed proof that a remediation branch is clean. |
 | What do I configure? | Add one AI key as a repository secret: `OPENAI_API_KEY` for `codex-openai` / Codex (OpenAI), or `ANTHROPIC_API_KEY` for `claude-anthropic` / Claude Code (Anthropic). Optional workflow inputs are listed below. |
 | How does the PR open? | The demo default is automatic PR creation with the workflow `GITHUB_TOKEN`. Set `create_pr=false` to publish proof and open the PR manually from the `reachable-remediate-*` branch. Branch protection and reviews still control merge. |
-| Where is the CI pipeline? | [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml). That workflow scans, optionally remediates, rescans, verifies the DB proof, and publishes sanitized evidence. |
-| Where do I run it? | GitHub Actions → [Run Demo](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate.yml). |
+| Where is the CI pipeline? | [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml) for Codex and [.github/workflows/reachable-remediate-claude.yml](.github/workflows/reachable-remediate-claude.yml) for Claude. Both scan, optionally remediate, rescan, verify the DB proof, and publish sanitized evidence. |
+| Where do I run it? | GitHub Actions → [Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate.yml) or [Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate-claude.yml). |
 | Where are the verdict and artifacts? | [Public verdict status page](https://sthenos-security.github.io/reach-testbed-go/) and [published artifacts](https://sthenos-security.github.io/reach-testbed-go/#artifacts). |
 | What is the expected vulnerable contract? | [EXPECTED.md](EXPECTED.md) and [expected/baseline.json](expected/baseline.json). |
 
