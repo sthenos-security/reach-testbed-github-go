@@ -39,7 +39,7 @@ jobs:
       remediate: ${{ inputs.remediate }}
       rescan_only: ${{ inputs.rescan_only }}
       create_pr: ${{ inputs.create_pr }}
-      remediation_mode: "claude-anthropic"
+      ai_mode: "anthropic-claude"
       prompt_profile: "balanced"
       signal_types: "all"
       max_batches: 1
@@ -47,6 +47,6 @@ jobs:
       publish_report: true
       require_ai: true
       fresh_scan: true
-      reachable_version: "1.0.0b107"
+      reachable_version: ""
       reachable_dist_repo: "sthenos-security/reach-dist"
     secrets: inherit

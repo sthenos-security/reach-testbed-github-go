@@ -2228,8 +2228,8 @@ def _render_markdown(*, summary: dict[str, Any], page_url: str, code_scanning_ur
 
 def _code_scanning_url() -> str:
     if os.environ.get("GITLAB_CI"):
-        project_url = os.environ.get("CI_PROJECT_URL", "").rstrip("/")
-        return f"{project_url}/-/security/vulnerability_report" if project_url else ""
+        pages_url = os.environ.get("CI_PAGES_URL", "").rstrip("/")
+        return f"{pages_url}/gl-sast-report.json" if pages_url else "gl-sast-report.json"
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     server = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
     return f"{server}/{repo}/security/code-scanning?query=category%3Areachable" if repo else ""

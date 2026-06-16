@@ -43,7 +43,7 @@ when the DB proof is clean, open a PR, and publish the verdict page.
 | `remediate` | `true` | Let CI create a fix branch and apply a bounded patch. |
 | `rescan_only` | `false` | Run the full release-gate loop: scan baseline, patch branch, rescan proof, publish evidence. |
 | `target_branch` | `main` | The branch being evaluated as the release candidate. |
-| `remediation_mode` | workflow-specific | `Run Demo (Codex)` uses `codex-openai` with `OPENAI_API_KEY`. `Run Demo (Claude)` uses `claude-anthropic` with `ANTHROPIC_API_KEY`. |
+| `ai_mode` | workflow-specific | `Run Demo (Codex)` uses `openai-codex` with `OPENAI_API_KEY`. `Run Demo (Claude)` uses `anthropic-claude` with `ANTHROPIC_API_KEY`. |
 | `prompt_profile` | `balanced` | Keeps fixes scoped: enough context to repair the issue queue without turning the run into an open-ended refactor. |
 | `signal_types` | `all` | Covers all demo blocker classes: CVE, CWE, secret, DLP, and AI findings. |
 | `max_batches` | `1` | Upper bound for serialized fix batches in this smoke-style public demo. The workflow stops after one bounded pass and proves the result from the database. |
@@ -62,9 +62,10 @@ enforcement point for language-specific tests such as `go test ./...`.
 
 Automatic PR creation is controlled by CI permissions, not by Reachable scanner
 tokens. Branch push, artifact upload, Pages publishing, and SARIF upload use the
-built-in `GITHUB_TOKEN`. PR creation also uses `GITHUB_TOKEN` first; an optional
-`CI_PR_TOKEN` can be configured only as a fallback. Branch protection and review
-policy still decide whether anything can merge.
+built-in `GITHUB_TOKEN`. If GitHub rejects automatic PR creation, the workflow
+keeps the pushed remediation branch and publishes the manual PR URL/path instead
+of hiding the auth failure in a green log. Branch protection and review policy
+still decide whether anything can merge.
 
 ### Manual PR Fallback
 
@@ -161,7 +162,7 @@ GitHub Actions:
 | Question | Answer |
 |----------|--------|
 | What is this repo? | A controlled vulnerable Go application used to demonstrate Reachable CI scanning, autonomous remediation, and DB-backed proof that a remediation branch is clean. |
-| What do I configure? | Add one AI key as a repository secret: `OPENAI_API_KEY` for `codex-openai` / Codex (OpenAI), or `ANTHROPIC_API_KEY` for `claude-anthropic` / Claude Code (Anthropic). Optional workflow inputs are listed below. |
+| What do I configure? | Add one AI key as a repository secret: `OPENAI_API_KEY` for `openai-codex` / Codex (OpenAI), or `ANTHROPIC_API_KEY` for `anthropic-claude` / Claude Code (Anthropic). Optional workflow inputs are listed below. |
 | How does the PR open? | The demo default is automatic PR creation with the workflow `GITHUB_TOKEN`. Set `create_pr=false` to publish proof and open the PR manually from the `reachable-remediate-*` branch. Branch protection and reviews still control merge. |
 | Where is the CI pipeline? | [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml) for Codex and [.github/workflows/reachable-remediate-claude.yml](.github/workflows/reachable-remediate-claude.yml) for Claude. Both scan, optionally remediate, rescan, verify the DB proof, and publish sanitized evidence. |
 | Where do I run it? | GitHub Actions → [Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate.yml) or [Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate-claude.yml). |
@@ -266,8 +267,8 @@ The demo supports two simple CI lanes:
 
 | Lane | Secret | Agent |
 |------|--------|-------|
-| `codex-openai` | `OPENAI_API_KEY` | Codex (OpenAI) |
-| `claude-anthropic` | `ANTHROPIC_API_KEY` | Claude Code (Anthropic) |
+| `openai-codex` | `OPENAI_API_KEY` | Codex (OpenAI) |
+| `anthropic-claude` | `ANTHROPIC_API_KEY` | Claude Code (Anthropic) |
 
 The workflow inputs are the operational guardrails. They define whether the
 run only scans, creates a remediation branch, verifies an existing branch, or
@@ -278,7 +279,8 @@ publishes fresh evidence.
 | `remediate` | `true` | Main kill switch. When false, CI scans and publishes evidence without changing code. |
 | `rescan_only` | `false` | Verifies `target_branch` as an existing branch; does not invoke an agent or create edits. |
 | `target_branch` | `main` | Baseline branch for normal runs, or the branch to verify when `rescan_only=true`. |
-| `remediation_mode` | `codex-openai` | Selects the agent lane and matching provider secret. |
+| `ai_mode` | `openai-codex` | Selects the agent lane and matching provider secret. |
+| `reachable_version` | empty/latest | Follows the latest Reachable release by default; set an exact version only for reproducible replay. |
 | `prompt_profile` | `balanced` | Controls how aggressively Reachable bundles remediation work. |
 | `signal_types` | `all` | Limits remediation to selected signal families, or leaves all families eligible. |
 | `max_batches` | `1` | Bounds the public demo to one serialized remediation batch so the run stays short and auditable. |
