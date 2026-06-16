@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate reach-testbed-go scanner output against the golden baseline."""
+"""Validate reach-testbed-github-go scanner output against the golden baseline."""
 
 from __future__ import annotations
 

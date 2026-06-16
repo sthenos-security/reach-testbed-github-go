@@ -269,12 +269,12 @@
     "job": "reachable-remediate",
     "provider": "github_actions",
     "ref": "refs/heads/main",
-    "repository": "sthenos-security/reach-testbed-go",
+    "repository": "sthenos-security/reach-testbed-github-go",
     "run_attempt": "1",
     "run_id": "26972297438",
-    "run_url": "https://github.com/sthenos-security/reach-testbed-go/actions/runs/26972297438",
+    "run_url": "https://github.com/sthenos-security/reach-testbed-github-go/actions/runs/26972297438",
     "sha": "8abd78310ce1a9f20fa6468725b802d297175743",
     "workflow": "Reachable Remediation Template",
-    "workflow_ref": "sthenos-security/reach-testbed-go/.github/workflows/reachable-remediate.yml@refs/heads/main"
+    "workflow_ref": "sthenos-security/reach-testbed-github-go/.github/workflows/reachable-remediate.yml@refs/heads/main"
   }
 }

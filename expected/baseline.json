@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "name": "reach-testbed-go golden baseline",
+  "name": "reach-testbed-github-go golden baseline",
   "verified_with_reachable": "1.0.0b97",
   "verified_scan_session": "20260603-082131-beef72",
   "notes": [

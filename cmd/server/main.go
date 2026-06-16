@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/reachable/reach-testbed-go/internal/handlers"
+	"github.com/reachable/reach-testbed-github-go/internal/handlers"
 )
 
 func main() {
@@ -17,6 +17,6 @@ func main() {
 		addr = configured
 	}
 
-	log.Printf("reach-testbed-go listening on %s", addr)
+	log.Printf("reach-testbed-github-go listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }

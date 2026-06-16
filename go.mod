@@ -1,4 +1,4 @@
-module github.com/reachable/reach-testbed-go
+module github.com/reachable/reach-testbed-github-go
 
 go 1.21
 

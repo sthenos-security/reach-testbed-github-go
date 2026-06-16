@@ -1,4 +1,4 @@
-# reach-testbed-go
+# reach-testbed-github-go
 
 **Intentionally vulnerable testbed. Not for production use.**
 
@@ -18,8 +18,8 @@ For product and company information, see [sthenosec.com](https://sthenosec.com/)
 The diagram above is the release-gate flow. GitHub exposes two explicit demo
 workflows so the provider lane is obvious in the Actions UI:
 
-- [GitHub Actions → Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate.yml)
-- [GitHub Actions → Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate-claude.yml)
+- [GitHub Actions → Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate.yml)
+- [GitHub Actions → Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-claude.yml)
 
 ### Which Action Do I Run?
 
@@ -73,7 +73,7 @@ Use this only if `create_pr=false`, or if GitHub blocks automatic PR creation
 after the workflow publishes a clean proof page and pushes the
 `reachable-remediate-<run_id>` branch.
 
-1. Open the repository [Branches page](https://github.com/sthenos-security/reach-testbed-go/branches).
+1. Open the repository [Branches page](https://github.com/sthenos-security/reach-testbed-github-go/branches).
 2. Find the latest `reachable-remediate-<run_id>` branch from the successful `Run Demo` log or verdict page.
 3. Click **New pull request** for that branch.
 4. Confirm `base: main` and `compare: reachable-remediate-<run_id>`.
@@ -165,8 +165,8 @@ GitHub Actions:
 | What do I configure? | Add one AI key as a repository secret: `OPENAI_API_KEY` for `openai-codex` / Codex (OpenAI), or `ANTHROPIC_API_KEY` for `anthropic-claude` / Claude Code (Anthropic). Optional workflow inputs are listed below. |
 | How does the PR open? | The demo default is automatic PR creation with the workflow `GITHUB_TOKEN`. Set `create_pr=false` to publish proof and open the PR manually from the `reachable-remediate-*` branch. Branch protection and reviews still control merge. |
 | Where is the CI pipeline? | [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml) for Codex and [.github/workflows/reachable-remediate-claude.yml](.github/workflows/reachable-remediate-claude.yml) for Claude. Both scan, optionally remediate, rescan, verify the DB proof, and publish sanitized evidence. |
-| Where do I run it? | GitHub Actions → [Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate.yml) or [Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-go/actions/workflows/reachable-remediate-claude.yml). |
-| Where are the verdict and artifacts? | [Public verdict status page](https://sthenos-security.github.io/reach-testbed-go/) and [published artifacts](https://sthenos-security.github.io/reach-testbed-go/#artifacts). |
+| Where do I run it? | GitHub Actions → [Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate.yml) or [Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-claude.yml). |
+| Where are the verdict and artifacts? | [Public verdict status page](https://sthenos-security.github.io/reach-testbed-github-go/) and [published artifacts](https://sthenos-security.github.io/reach-testbed-github-go/#artifacts). |
 | What is the expected vulnerable contract? | [EXPECTED.md](EXPECTED.md) and [expected/baseline.json](expected/baseline.json). |
 
 ## Demo Verdict
@@ -174,7 +174,7 @@ GitHub Actions:
 The public demo page is the release-facing proof view for the last published
 successful proof:
 
-<https://sthenos-security.github.io/reach-testbed-go/>
+<https://sthenos-security.github.io/reach-testbed-github-go/>
 
 That page is built from Reachable scan evidence. It shows the branch, commit,
 scan ID, and CI run it came from. The GitHub Actions workflow list remains the
@@ -249,13 +249,13 @@ not private execution material.
 
 | Artifact | Purpose |
 |----------|---------|
-| [summary.json](https://sthenos-security.github.io/reach-testbed-go/summary.json) | Compact DB-backed run summary for the public page. |
-| [db-remediation-verdict.json](https://sthenos-security.github.io/reach-testbed-go/db-remediation-verdict.json) | Machine-readable baseline/proof comparison and final verdict. |
-| [reachable.sarif](https://sthenos-security.github.io/reach-testbed-go/reachable.sarif) | Compatibility export for GitHub Code Scanning; not the demo verdict source. |
-| [remediation-ledger.json](https://sthenos-security.github.io/reach-testbed-go/remediation-ledger.json) | Sanitized remediation summary with rule IDs and outcomes, not prompt text. |
-| [compliance.json](https://sthenos-security.github.io/reach-testbed-go/compliance.json) | DB-backed compliance evidence extract. |
-| [compliance-narrative.json](https://sthenos-security.github.io/reach-testbed-go/compliance-narrative.json) | Evidence-cited narrative draft for review, not a legal attestation. |
-| [expected-results.html](https://sthenos-security.github.io/reach-testbed-go/expected-results.html) | Branded expected issue contract and baseline proof criteria. |
+| [summary.json](https://sthenos-security.github.io/reach-testbed-github-go/summary.json) | Compact DB-backed run summary for the public page. |
+| [db-remediation-verdict.json](https://sthenos-security.github.io/reach-testbed-github-go/db-remediation-verdict.json) | Machine-readable baseline/proof comparison and final verdict. |
+| [reachable.sarif](https://sthenos-security.github.io/reach-testbed-github-go/reachable.sarif) | Compatibility export for GitHub Code Scanning; not the demo verdict source. |
+| [remediation-ledger.json](https://sthenos-security.github.io/reach-testbed-github-go/remediation-ledger.json) | Sanitized remediation summary with rule IDs and outcomes, not prompt text. |
+| [compliance.json](https://sthenos-security.github.io/reach-testbed-github-go/compliance.json) | DB-backed compliance evidence extract. |
+| [compliance-narrative.json](https://sthenos-security.github.io/reach-testbed-github-go/compliance-narrative.json) | Evidence-cited narrative draft for review, not a legal attestation. |
+| [expected-results.html](https://sthenos-security.github.io/reach-testbed-github-go/expected-results.html) | Branded expected issue contract and baseline proof criteria. |
 
 The workflow must not publish raw remediation bundles, prompt text, generated
 rule packs, skills databases, fuzz or pentest prompts, agent transcripts, raw

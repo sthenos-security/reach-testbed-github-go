@@ -116,7 +116,7 @@
     "expected_total": 21,
     "fixed": 21,
     "headline": "All expected demo vulnerabilities were found and the remediation branch has no blocking findings.",
-    "name": "reach-testbed-go golden baseline",
+    "name": "reach-testbed-github-go golden baseline",
     "rows": [
       {
         "actual_exploitability": "DEFENDED",
@@ -1357,7 +1357,7 @@
     ],
     "status": "success"
   },
-  "repo": "sthenos-security/reach-testbed-go",
+  "repo": "sthenos-security/reach-testbed-github-go",
   "run_id": "26972297438",
   "sarif_error": null,
   "sha": "8abd78310ce1a9f20fa6468725b802d297175743",
@@ -1374,7 +1374,7 @@
     "message": "All expected demo vulnerabilities were found and the remediation branch has no blocking findings.",
     "mode": "DB-backed baseline/remediation proof",
     "results": 0,
-    "run_url": "https://github.com/sthenos-security/reach-testbed-go/actions/runs/26972297438",
+    "run_url": "https://github.com/sthenos-security/reach-testbed-github-go/actions/runs/26972297438",
     "status": "db_verified"
   }
 }

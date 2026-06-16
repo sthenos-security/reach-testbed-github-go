@@ -1,6 +1,6 @@
 # Reachable Go Testbed Expected Results
 
-This file is the human-readable contract for `reach-testbed-go`. It explains
+This file is the human-readable contract for `reach-testbed-github-go`. It explains
 what the vulnerable baseline is expected to contain, what the remediation proof
 must show, and what each synthetic issue represents.
 

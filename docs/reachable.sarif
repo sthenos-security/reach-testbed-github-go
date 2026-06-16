@@ -52,7 +52,7 @@
       },
       "versionControlProvenance": [
         {
-          "repositoryUri": "https://github.com/sthenos-security/reach-testbed-go",
+          "repositoryUri": "https://github.com/sthenos-security/reach-testbed-github-go",
           "branch": "reachable-remediate-26972297438",
           "revisionId": "8abd78310ce1a9f20fa6468725b802d297175743"
         }

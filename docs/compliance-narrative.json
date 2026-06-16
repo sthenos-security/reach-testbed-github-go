@@ -1,7 +1,7 @@
 {
   "audience": "auditor",
   "created_at": "2026-06-04 18:50:22",
-  "db_path": "<runner-local-path-withheld>/reach-testbed-go-d6485ada/repo.db",
+  "db_path": "<runner-local-path-withheld>/reach-testbed-github-go-d6485ada/repo.db",
   "error": null,
   "framework": "all",
   "id": 2,
@@ -105,7 +105,7 @@
       "reachable_findings": 0,
       "risk_level": "NONE",
       "risk_score": 0,
-      "scan_dir": "<runner-local-path-withheld>/reach-testbed-go-d6485ada/reachable-remediate-26972297438/20260604-185016-59ceb1",
+      "scan_dir": "<runner-local-path-withheld>/reach-testbed-github-go-d6485ada/reachable-remediate-26972297438/20260604-185016-59ceb1",
       "source_files_scanned": 28,
       "status": "complete",
       "timestamp": "2026-06-04 18:50:16",

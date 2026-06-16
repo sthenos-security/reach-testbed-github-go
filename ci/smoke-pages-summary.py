@@ -35,7 +35,7 @@ def main() -> int:
                 "logicalLocation": {"name": "handler"},
                 "physicalLocation": {
                     "artifactLocation": {
-                        "uri": "/home/runner/work/reach-testbed-go/reach-testbed-go/internal/handlers/cwe.go"
+                        "uri": "/home/runner/work/reach-testbed-github-go/reach-testbed-github-go/internal/handlers/cwe.go"
                     },
                     "region": {"startLine": 12},
                 },

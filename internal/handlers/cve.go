@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/reachable/reach-testbed-go/internal/safety"
+	"github.com/reachable/reach-testbed-github-go/internal/safety"
 	"golang.org/x/text/language"
 	"gopkg.in/yaml.v2"
 )

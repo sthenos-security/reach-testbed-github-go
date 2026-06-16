@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: reach-testbed-go
+  name: reach-testbed-github-go
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: reach-testbed-go
+      app: reach-testbed-github-go
   template:
     metadata:
       labels:
-        app: reach-testbed-go
+        app: reach-testbed-github-go
     spec:
       containers:
         - name: app
-          image: example.invalid/reach-testbed-go:synthetic
+          image: example.invalid/reach-testbed-github-go:synthetic
           securityContext:
             privileged: true
             allowPrivilegeEscalation: true

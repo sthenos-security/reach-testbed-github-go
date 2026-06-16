@@ -179,7 +179,7 @@ def _expected_demo_unavailable(*, reason: str) -> dict[str, Any]:
     )
     expected_total = 0
     verified_with = ""
-    name = "reach-testbed-go golden baseline"
+    name = "reach-testbed-github-go golden baseline"
     if expected_path.exists():
         expected = _load_json(expected_path)
         expected_total = len(((expected.get("sarif") or {}).get("results") or []))
@@ -317,7 +317,7 @@ def _expected_demo_summary(*, artifact_dir: Path) -> dict[str, Any]:
 
     return {
         "available": True,
-        "name": expected.get("name") or "reach-testbed-go golden baseline",
+        "name": expected.get("name") or "reach-testbed-github-go golden baseline",
         "verified_with_reachable": expected.get("verified_with_reachable") or "",
         "expected_total": expected_total,
         "baseline_found": baseline_found,

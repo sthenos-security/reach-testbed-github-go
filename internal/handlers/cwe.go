@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"os/exec"
 
-	"github.com/reachable/reach-testbed-go/internal/safety"
+	"github.com/reachable/reach-testbed-github-go/internal/safety"
 )
 
 func DiagnosticPing(w http.ResponseWriter, r *http.Request) {
