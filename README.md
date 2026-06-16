@@ -67,6 +67,17 @@ keeps the pushed remediation branch and publishes the manual PR URL/path instead
 of hiding the auth failure in a green log. Branch protection and review policy
 still decide whether anything can merge.
 
+`MCP_GITHUB_TOKEN` is the optional read-only source token for higher-quality
+GitHub package context. Create it as a fine-grained PAT at
+<https://github.com/settings/personal-access-tokens/new>, choose the GitHub
+**Resource owner** that owns the source repos Reachable may inspect, and grant
+**Repository permissions -> Contents: Read-only**. GitHub adds **Metadata:
+Read-only** automatically. Use **Only select repositories** for a fixed set, or
+**All repositories** when the demo must read any current/future repo for that
+owner; **Public repositories** is enough only for public source repos. The token
+is used for MCP context and git clone fallback when MCP cannot fetch a package
+directly. It is not used to push branches or open PRs.
+
 ### Manual PR Fallback
 
 Use this only if `create_pr=false`, or if GitHub blocks automatic PR creation
@@ -162,7 +173,7 @@ GitHub Actions:
 | Question | Answer |
 |----------|--------|
 | What is this repo? | A controlled vulnerable Go application used to demonstrate Reachable CI scanning, autonomous remediation, and DB-backed proof that a remediation branch is clean. |
-| What do I configure? | Add one AI key as a repository secret: `OPENAI_API_KEY` for `openai-codex` / Codex (OpenAI), or `ANTHROPIC_API_KEY` for `anthropic-claude` / Claude Code (Anthropic). Optional workflow inputs are listed below. |
+| What do I configure? | Add one AI key as a repository secret: `OPENAI_API_KEY` for `openai-codex` / Codex (OpenAI), or `ANTHROPIC_API_KEY` for `anthropic-claude` / Claude Code (Anthropic). Add `MCP_GITHUB_TOKEN` when you want read-only GitHub source/MCP context and package git fallback. Optional workflow inputs are listed below. |
 | How does the PR open? | The demo default is automatic PR creation with the workflow `GITHUB_TOKEN`. Set `create_pr=false` to publish proof and open the PR manually from the `reachable-remediate-*` branch. Branch protection and reviews still control merge. |
 | Where is the CI pipeline? | [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml) for Codex and [.github/workflows/reachable-remediate-claude.yml](.github/workflows/reachable-remediate-claude.yml) for Claude. Both scan, optionally remediate, rescan, verify the DB proof, and publish sanitized evidence. |
 | Where do I run it? | GitHub Actions → [Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate.yml) or [Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-claude.yml). |
