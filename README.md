@@ -280,7 +280,6 @@ publishes fresh evidence.
 | `rescan_only` | `false` | Verifies `target_branch` as an existing branch; does not invoke an agent or create edits. |
 | `target_branch` | `main` | Baseline branch for normal runs, or the branch to verify when `rescan_only=true`. |
 | `ai_mode` | `openai-codex` | Selects the agent lane and matching provider secret. |
-| `reachable_version` | empty/latest | Follows the latest Reachable release by default; set an exact version only for reproducible replay. |
 | `prompt_profile` | `balanced` | Controls how aggressively Reachable bundles remediation work. |
 | `signal_types` | `all` | Limits remediation to selected signal families, or leaves all families eligible. |
 | `max_batches` | `1` | Bounds the public demo to one serialized remediation batch so the run stays short and auditable. |
