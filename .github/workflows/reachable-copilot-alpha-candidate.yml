@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       candidate_run_id:
-        description: "reach-core Test Release run ID that produced candidate-dist-alpha-py3.14-linux_x86_64-macos-universal2"
+        description: "reach-core Test Release run ID that produced candidate-dist-alpha-py3.14-linux-x86_64-macos-universal2"
         type: string
         required: true
       candidate_artifact_name:
         description: "reach-core candidate dist artifact name"
         type: string
-        default: "candidate-dist-alpha-py3.14-linux_x86_64-macos-universal2"
+        default: "candidate-dist-alpha-py3.14-linux-x86_64-macos-universal2"
       target_branch:
         description: "Base branch to scan and dispatch Copilot remediation tasks from"
         type: string
