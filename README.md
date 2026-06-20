@@ -2,10 +2,11 @@
 
 **Intentionally vulnerable testbed. Not for production use.**
 
-This repository is a controlled Go fixture for demonstrating Reachable CI/CD
-scanning, agentic remediation, and DB-backed post-fix proof.
+This repository is a controlled Go fixture for demonstrating REACHABLE code
+exploitability analysis and risk posture reduction in GitHub Actions.
 
-For product and company information, see [sthenosec.com](https://sthenosec.com/).
+For the public guide and provider map, see
+[CI auto-remediation on sthenosec.com](https://sthenosec.com/resources/auto-remediation).
 
 ## Repo Role
 
@@ -14,9 +15,14 @@ GitHub Marketplace action listing.
 
 | Repo | Role |
 |---|---|
-| [`reach-testbed-github-marketplace`](https://github.com/sthenos-security/reach-testbed-github-marketplace) | GitHub Marketplace distribution surface plus the configurable root action. |
+| [`Reachable Security Scan and Remediation`](https://github.com/marketplace/actions/reachable-security-scan-and-remediation) | GitHub Marketplace action for customer installation. |
+| [`reachable` GitLab Catalog component](https://gitlab.com/explore/catalog/sthenos-security-public/reach-testbed-gitlab-catalog) | GitLab Catalog component for customer installation. |
+| [`reach-testbed-github-marketplace`](https://github.com/sthenos-security/reach-testbed-github-marketplace) | GitHub Marketplace distribution repo plus the configurable root action. |
 | [`reach-ci-github`](https://github.com/sthenos-security/reach-ci-github) | Reusable GitHub Actions toolkit for production remediation workflows. |
 | `reach-testbed-github-go` | Public GitHub demo repo for full remediation proof and scan-only runs with remediation disabled. |
+
+Contact [Sthenos Security](mailto:info@sthenosec.com?subject=Custom%20CI%2FCD%20integration)
+for custom CI/CD integration.
 
 > Do not deploy, fork as an application template, or reuse this code in a
 > production service. The vulnerabilities are deliberate synthetic fixtures for
