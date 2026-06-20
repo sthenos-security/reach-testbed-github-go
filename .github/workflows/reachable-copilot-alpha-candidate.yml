@@ -1,0 +1,172 @@
+# Go-demo Copilot proof against a non-published Reachable alpha candidate dist.
+# This workflow consumes the two-wheel reach-core Test Release artifact directly;
+# it does not publish to reach-dist and does not use reach-ci-github as a target app.
+name: "Run Demo (Copilot Alpha Candidate)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: "reach-core Test Release run ID that produced candidate-dist-alpha-py3.14-linux_x86_64-macos-universal2"
+        type: string
+        required: true
+      candidate_artifact_name:
+        description: "reach-core candidate dist artifact name"
+        type: string
+        default: "candidate-dist-alpha-py3.14-linux_x86_64-macos-universal2"
+      target_branch:
+        description: "Base branch to scan and dispatch Copilot remediation tasks from"
+        type: string
+        default: "main"
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  security-events: write
+
+jobs:
+  copilot-alpha-candidate:
+    name: Copilot alpha candidate proof
+    runs-on: ubuntu-latest
+    env:
+      CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      CANDIDATE_ARTIFACT_NAME: ${{ inputs.candidate_artifact_name }}
+      REACHABLE_COPILOT_USER_TOKEN: ${{ secrets.REACHABLE_COPILOT_USER_TOKEN }}
+      MCP_GITHUB_TOKEN: ${{ secrets.MCP_GITHUB_TOKEN }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.target_branch }}
+          fetch-depth: 1
+
+      - name: Validate required inputs and secrets
+        run: |
+          set -euo pipefail
+          if [ -z "${CANDIDATE_RUN_ID}" ]; then
+            echo "candidate_run_id is required." >&2
+            exit 2
+          fi
+          if [ -z "${REACHABLE_COPILOT_USER_TOKEN:-}" ]; then
+            echo "REACHABLE_COPILOT_USER_TOKEN is required for Copilot alpha candidate proof." >&2
+            exit 2
+          fi
+
+      - name: Download Reachable alpha candidate dist
+        env:
+          GH_TOKEN: ${{ secrets.REACHABLE_GITHUB_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf candidate-dist
+          mkdir -p candidate-dist
+          gh run download "${CANDIDATE_RUN_ID}" \
+            --repo sthenos-security/reach-core \
+            --name "${CANDIDATE_ARTIFACT_NAME}" \
+            --dir candidate-dist
+          test -s candidate-dist/latest.json
+          test -s candidate-dist/checksums.sha256
+          test -s candidate-dist/constraints.txt
+          test -x candidate-dist/install.sh
+          find candidate-dist -maxdepth 2 -type f | sort
+
+      - name: Install Reachable from alpha candidate dist
+        run: |
+          set -euo pipefail
+          rm -rf "$HOME/.reachable"
+          export PATH="$HOME/.reachable/venv/bin:$HOME/.reachable/tools/bin:$PATH"
+          REACHABLE_DIST_ROOT="$PWD/candidate-dist" bash candidate-dist/install.sh --clean
+          echo "$HOME/.reachable/venv/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.reachable/tools/bin" >> "$GITHUB_PATH"
+          reachctl version
+          reachctl doctor --ci
+
+      - name: Baseline scan
+        run: |
+          set -euo pipefail
+          mkdir -p .reachable/ci-artifacts
+          reachctl scan . --ci \
+            --fail-on none \
+            --branch "${{ inputs.target_branch }}" \
+            --commit "$(git rev-parse HEAD)" \
+            --sarif .reachable/ci-artifacts/reachable.sarif
+
+      - name: Dispatch Copilot remediation task
+        run: |
+          set -euo pipefail
+          mkdir -p .reachable/ci-artifacts
+          repo_db="$(python -c 'from reachable.ci.proof_page import find_latest_repo_db; print(find_latest_repo_db())')"
+          echo "REACHABLE_REPO_DB=${repo_db}" >> "$GITHUB_ENV"
+          reachctl copilot doctor --repo "${GITHUB_REPOSITORY}" --json > .reachable/ci-artifacts/copilot-doctor.json
+          reachctl copilot dispatch \
+            --repo-db "$repo_db" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --mode reachable-high \
+            --max-tasks 1 \
+            --base-ref "${{ inputs.target_branch }}" \
+            --json > .reachable/ci-artifacts/copilot-dispatch.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path(".reachable/ci-artifacts/copilot-dispatch.json").read_text(encoding="utf-8"))
+          tasks = payload.get("tasks")
+          if not isinstance(tasks, list) or not tasks:
+              raise SystemExit("Copilot dispatch produced zero tasks")
+          missing = [
+              task.get("task_id") or task.get("issue_number") or "<unknown>"
+              for task in tasks
+              if not (task.get("issue_url") or task.get("github_task_id"))
+          ]
+          if missing:
+              raise SystemExit("Copilot tasks missing GitHub issue/task identifiers: " + ", ".join(missing))
+          print(f"Dispatched {len(tasks)} Copilot task(s).")
+          PY
+
+      - name: Publish local proof artifact
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          python -m reachable.ci.proof_page \
+            --repo-db "${REACHABLE_REPO_DB}" \
+            --output-dir .reachable/ci-artifacts/release-proof \
+            --repository "${GITHUB_REPOSITORY}" \
+            --branch "${{ inputs.target_branch }}" \
+            --commit "$(git rev-parse HEAD)" \
+            --run-url "$run_url" \
+            --workspace "${GITHUB_WORKSPACE}" \
+            --require-copilot-tasks
+          reachctl export --repo . --format json --output .reachable/ci-artifacts/reachable-report.json
+          reachctl export --repo . --format summary --output .reachable/ci-artifacts/reachable-summary.txt
+
+      - name: Verify proof artifact
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          summary = json.loads(Path(".reachable/ci-artifacts/release-proof/summary.json").read_text(encoding="utf-8"))
+          tasks = summary.get("copilot_tasks")
+          if not isinstance(tasks, list) or not tasks:
+              raise SystemExit("release proof summary has no scan-scoped Copilot task rows")
+          missing = [
+              task.get("task_id") or "<unknown>"
+              for task in tasks
+              if not (task.get("issue_url") or task.get("github_task_id"))
+          ]
+          if missing:
+              raise SystemExit("release proof Copilot rows missing GitHub issue/task identifiers: " + ", ".join(missing))
+          print(f"Verified {len(tasks)} Copilot proof row(s).")
+          PY
+
+      - name: Upload Reachable artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: reachable-copilot-alpha-candidate-proof
+          path: .reachable/ci-artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
