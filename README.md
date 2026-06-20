@@ -16,8 +16,7 @@ GitHub Marketplace action listing.
 |---|---|
 | [`reach-testbed-github-marketplace`](https://github.com/sthenos-security/reach-testbed-github-marketplace) | GitHub Marketplace distribution surface plus the configurable root action. |
 | [`reach-ci-github`](https://github.com/sthenos-security/reach-ci-github) | Reusable GitHub Actions toolkit for production remediation workflows. |
-| `reach-testbed-github-go` | Go public-clone/remediation proof demo with expected findings and public proof page. |
-| [`reach-testbed-github`](https://github.com/sthenos-security/reach-testbed-github) | Basic GitHub scan demo and simple scanner reference. |
+| `reach-testbed-github-go` | Public GitHub demo repo for full remediation proof and scan-only runs with remediation disabled. |
 
 > Do not deploy, fork as an application template, or reuse this code in a
 > production service. The vulnerabilities are deliberate synthetic fixtures for
@@ -32,6 +31,10 @@ workflows so the provider lane is obvious in the Actions UI:
 
 - [GitHub Actions → Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate.yml)
 - [GitHub Actions → Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-claude.yml)
+
+This repo is also the public scan-only sample surface. There is no separate
+public legacy scan repo in the supported contract; use the same toolkit-backed
+workflow here with `remediate=false`.
 
 ### Which Action Do I Run?
 
