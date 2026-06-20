@@ -1,0 +1,119 @@
+# Generated from the Reachable GitHub demo wrapper.
+# This workflow is the Go demo proof gate for GitHub Copilot dispatch. It
+# consumes the Reachable CI toolkit from this demo repo and then verifies the
+# published artifact, so the toolkit repo is never used as the target app.
+name: "Run Demo (Copilot E2E)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Base branch to scan and dispatch Copilot remediation tasks from
+        type: string
+        default: "main"
+      scan_mode:
+        description: Use real for full Reachable execution, or nop for CI integration smoke tests without scanner or Copilot dispatch
+        type: string
+        default: "real"
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+  id-token: write
+  pages: write
+  pull-requests: write
+  security-events: write
+
+jobs:
+  reachable-copilot-dispatch:
+    uses: sthenos-security/reach-ci-github/.github/workflows/auto-remediate.yml@v1
+    with:
+      target_branch: ${{ inputs.target_branch }}
+      remediate: true
+      rescan_only: false
+      scan_mode: ${{ inputs.scan_mode }}
+      create_pr: false
+      ai_mode: "copilot-github"
+      prompt_profile: "balanced"
+      signal_types: "all"
+      max_batches: 1
+      rescan_strategy: "each_batch"
+      publish_report: true
+      require_ai: true
+      fresh_scan: true
+      reachable_dist_repo: "sthenos-security/reach-dist"
+    secrets: inherit
+
+  verify-copilot-dispatch-proof:
+    name: Verify Copilot dispatch proof
+    runs-on: ubuntu-latest
+    needs: reachable-copilot-dispatch
+    if: ${{ always() }}
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Download Reachable artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: reachable-ci-artifacts
+          path: reachable-proof
+
+      - name: Require dispatched Copilot task proof
+        env:
+          DISPATCH_RESULT: ${{ needs.reachable-copilot-dispatch.result }}
+        run: |
+          set -euo pipefail
+          find reachable-proof -maxdepth 4 -type f | sort
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          root = Path("reachable-proof")
+          dispatch_files = sorted(root.rglob("copilot-dispatch.json"))
+          if not dispatch_files:
+              raise SystemExit("missing copilot-dispatch.json artifact")
+          dispatch_path = dispatch_files[0]
+          if dispatch_path.stat().st_size == 0:
+              raise SystemExit("copilot-dispatch.json is empty")
+          dispatch = json.loads(dispatch_path.read_text(encoding="utf-8"))
+          tasks = dispatch.get("tasks")
+          if not isinstance(tasks, list) or not tasks:
+              raise SystemExit("copilot-dispatch.json does not contain dispatched tasks")
+          missing_external = [
+              task.get("task_id") or task.get("issue_number") or "<unknown>"
+              for task in tasks
+              if not (task.get("issue_url") or task.get("github_task_id"))
+          ]
+          if missing_external:
+              raise SystemExit(
+                  "Copilot tasks are missing GitHub issue/task identifiers: "
+                  + ", ".join(map(str, missing_external))
+              )
+
+          summary_files = sorted(root.rglob("summary.json"))
+          if not summary_files:
+              raise SystemExit("missing release-proof summary.json artifact")
+          summary = json.loads(summary_files[0].read_text(encoding="utf-8"))
+          proof_tasks = summary.get("copilot_tasks")
+          if not isinstance(proof_tasks, list) or not proof_tasks:
+              raise SystemExit("release proof summary has no scan-scoped Copilot task rows")
+          proof_missing_external = [
+              task.get("task_id") or "<unknown>"
+              for task in proof_tasks
+              if not (task.get("issue_url") or task.get("github_task_id"))
+          ]
+          if proof_missing_external:
+              raise SystemExit(
+                  "release proof Copilot rows are missing GitHub issue/task identifiers: "
+                  + ", ".join(map(str, proof_missing_external))
+              )
+
+          if os.environ.get("DISPATCH_RESULT") != "success":
+              raise SystemExit(f"Copilot dispatch job did not succeed: {os.environ.get('DISPATCH_RESULT')}")
+
+          print(f"Verified {len(tasks)} dispatched Copilot task(s) and {len(proof_tasks)} proof row(s).")
+          PY
