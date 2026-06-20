@@ -105,13 +105,17 @@ jobs:
           mkdir -p .reachable/ci-artifacts
           repo_db="$(python -c 'from reachable.ci.proof_page import find_latest_repo_db; print(find_latest_repo_db())')"
           echo "REACHABLE_REPO_DB=${repo_db}" >> "$GITHUB_ENV"
-          reachctl copilot doctor --repo "${GITHUB_REPOSITORY}" --json > .reachable/ci-artifacts/copilot-doctor.json
+          reachctl copilot doctor \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dispatch-kind agent_task \
+            --json > .reachable/ci-artifacts/copilot-doctor.json
           reachctl copilot dispatch \
             --repo-db "$repo_db" \
             --repo "${GITHUB_REPOSITORY}" \
             --mode reachable-high \
             --max-tasks 1 \
             --base-ref "${{ inputs.target_branch }}" \
+            --dispatch-kind agent_task \
             --json > .reachable/ci-artifacts/copilot-dispatch.json
           python3 - <<'PY'
           import json
