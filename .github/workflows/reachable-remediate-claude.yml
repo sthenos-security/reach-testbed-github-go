@@ -18,6 +18,10 @@ on:
         description: Only verify target_branch; do not edit code
         type: boolean
         default: false
+      scan_mode:
+        description: Use real for full Reachable execution, or nop for CI integration smoke tests without scanner or agent execution
+        type: string
+        default: "real"
       create_pr:
         description: Open a remediation pull request after proof passes
         type: boolean
@@ -38,6 +42,7 @@ jobs:
       target_branch: ${{ inputs.target_branch }}
       remediate: ${{ inputs.remediate }}
       rescan_only: ${{ inputs.rescan_only }}
+      scan_mode: ${{ inputs.scan_mode }}
       create_pr: ${{ inputs.create_pr }}
       ai_mode: "anthropic-claude"
       prompt_profile: "balanced"
