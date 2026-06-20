@@ -37,6 +37,7 @@ workflows so the provider lane is obvious in the Actions UI:
 
 - [GitHub Actions → Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate.yml)
 - [GitHub Actions → Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-claude.yml)
+- [GitHub Actions → Run Demo (Copilot Dispatch)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-copilot.yml)
 
 This repo is also the public scan-only sample surface. There is no separate
 public legacy scan repo in the supported contract; use the same toolkit-backed
@@ -48,6 +49,7 @@ workflow here with `remediate=false`.
 |------------------------|------------------|---------------|
 | `Run Demo (Codex)` | Scan the vulnerable release candidate, create a fix branch, test it, rescan it, open or prepare a PR, and publish the verdict status page with the Codex/OpenAI lane. | Yes |
 | `Run Demo (Claude)` | Run the same remediation demo with the Claude/Anthropic lane so GitHub clearly shows support for both providers. | Yes |
+| `Run Demo (Copilot Dispatch)` | Scan the vulnerable release candidate and dispatch bounded GitHub Copilot cloud-agent issues/tasks from DB-backed evidence. Copilot PRs require later REACHABLE verification before they are considered ready. | Yes |
 | `Reset Demo` | Delete old `reachable-remediate-*` demo branches before a fresh run. | Optional |
 | `pages-build-deployment` | Publish Verdict Status Page. This is GitHub Pages plumbing created automatically after `Run Demo` publishes results. | No |
 
@@ -64,7 +66,7 @@ when the DB proof is clean, open a PR, and publish the verdict page.
 | `remediate` | `true` | Let CI create a fix branch and apply a bounded patch. |
 | `rescan_only` | `false` | Run the full release-gate loop: scan baseline, patch branch, rescan proof, publish evidence. |
 | `target_branch` | `main` | The branch being evaluated as the release candidate. |
-| `ai_mode` | workflow-specific | `Run Demo (Codex)` uses `openai-codex` with `OPENAI_API_KEY`. `Run Demo (Claude)` uses `anthropic-claude` with `ANTHROPIC_API_KEY`. |
+| `ai_mode` | workflow-specific | `Run Demo (Codex)` uses `openai-codex` with `OPENAI_API_KEY`. `Run Demo (Claude)` uses `anthropic-claude` with `ANTHROPIC_API_KEY`. `Run Demo (Copilot Dispatch)` uses `copilot-github` with `REACHABLE_COPILOT_USER_TOKEN`. |
 | `prompt_profile` | `balanced` | Keeps fixes scoped: enough context to repair the issue queue without turning the run into an open-ended refactor. |
 | `signal_types` | `all` | Covers all demo blocker classes: CVE, CWE, secret, DLP, and AI findings. |
 | `max_batches` | `1` | Upper bound for serialized fix batches in this smoke-style public demo. The workflow stops after one bounded pass and proves the result from the database. |
@@ -165,6 +167,7 @@ release blockers, and publishes proof for that branch.
 |----------|---------|
 | `Run Demo (Codex)` | Main GitHub Codex demo workflow. |
 | `Run Demo (Claude)` | Main GitHub Claude demo workflow. |
+| `Run Demo (Copilot Dispatch)` | Async GitHub Copilot cloud-agent dispatch workflow. It scans and creates Copilot tasks; a later verification pass decides whether Copilot PRs are ready. |
 | `Reset Demo` | Deletes old `reachable-remediate-*` branches when resetting the demo. Use `dry_run=true` first if you want to preview. |
 | `pages-build-deployment` | Publish Verdict Status Page. This is GitHub Pages plumbing. Do not run it manually; it appears after `Run Demo` publishes results. |
 
@@ -172,7 +175,7 @@ release blockers, and publishes proof for that branch.
 
 The workflow code is [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml)
 for Codex and [.github/workflows/reachable-remediate-claude.yml](.github/workflows/reachable-remediate-claude.yml)
-for Claude.
+for Claude. Copilot dispatch lives in [.github/workflows/reachable-remediate-copilot.yml](.github/workflows/reachable-remediate-copilot.yml).
 These helper scripts keep the release-gate logic auditable and testable outside
 GitHub Actions:
 
@@ -295,12 +298,14 @@ witness payloads, or local `repo.db` files.
 
 ## Agent Lanes And Workflow Inputs
 
-The demo supports two simple CI lanes:
+The demo supports two synchronous coding-agent lanes plus one async Copilot
+dispatch lane:
 
 | Lane | Secret | Agent |
 |------|--------|-------|
 | `openai-codex` | `OPENAI_API_KEY` | Codex (OpenAI) |
 | `anthropic-claude` | `ANTHROPIC_API_KEY` | Claude Code (Anthropic) |
+| `copilot-github` | `REACHABLE_COPILOT_USER_TOKEN` | GitHub Copilot cloud-agent dispatch; PR readiness still requires later REACHABLE verification |
 
 The workflow inputs are the operational guardrails. They define whether the
 run only scans, creates a remediation branch, verifies an existing branch, or
