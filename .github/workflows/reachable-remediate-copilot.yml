@@ -16,8 +16,8 @@ on:
         default: "real"
 
 permissions:
-  actions: read
-  contents: read
+  actions: write
+  contents: write
   issues: write
   id-token: write
   pages: write
