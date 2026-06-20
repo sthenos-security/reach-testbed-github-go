@@ -7,6 +7,18 @@ scanning, agentic remediation, and DB-backed post-fix proof.
 
 For product and company information, see [sthenosec.com](https://sthenosec.com/).
 
+## Repo Role
+
+This repo is the GitHub Go/public-clone remediation proof demo. It is not the
+GitHub Marketplace action listing.
+
+| Repo | Role |
+|---|---|
+| [`reach-testbed-github-marketplace`](https://github.com/sthenos-security/reach-testbed-github-marketplace) | GitHub Marketplace distribution surface plus the configurable root action. |
+| [`reach-ci-github`](https://github.com/sthenos-security/reach-ci-github) | Reusable GitHub Actions toolkit for production remediation workflows. |
+| `reach-testbed-github-go` | Go public-clone/remediation proof demo with expected findings and public proof page. |
+| [`reach-testbed-github`](https://github.com/sthenos-security/reach-testbed-github) | Basic GitHub scan demo and simple scanner reference. |
+
 > Do not deploy, fork as an application template, or reuse this code in a
 > production service. The vulnerabilities are deliberate synthetic fixtures for
 > scanner validation and controlled demos only.
