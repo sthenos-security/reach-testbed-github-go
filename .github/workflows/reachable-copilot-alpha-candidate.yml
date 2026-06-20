@@ -72,6 +72,12 @@ jobs:
           test -x candidate-dist/install.sh
           find candidate-dist -maxdepth 2 -type f | sort
 
+      - name: Set up Python 3.14 for alpha candidate
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+
       - name: Install Reachable from alpha candidate dist
         run: |
           set -euo pipefail
