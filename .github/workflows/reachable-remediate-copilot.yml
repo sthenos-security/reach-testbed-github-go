@@ -1,0 +1,45 @@
+# Generated from the Reachable GitHub demo wrapper.
+# This is the async GitHub Copilot cloud-agent dispatch lane. Copilot PRs still
+# require a separate REACHABLE verification pass before they are considered ready.
+name: "Run Demo (Copilot Dispatch)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Base branch to scan and dispatch Copilot remediation tasks from
+        type: string
+        default: "main"
+      scan_mode:
+        description: Use real for full Reachable execution, or nop for CI integration smoke tests without scanner or Copilot dispatch
+        type: string
+        default: "real"
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  id-token: write
+  pages: write
+  pull-requests: write
+  security-events: write
+
+jobs:
+  reachable-copilot-dispatch:
+    uses: sthenos-security/reach-ci-github/.github/workflows/auto-remediate.yml@main
+    with:
+      target_branch: ${{ inputs.target_branch }}
+      remediate: true
+      rescan_only: false
+      scan_mode: ${{ inputs.scan_mode }}
+      create_pr: false
+      ai_mode: "copilot-github"
+      prompt_profile: "balanced"
+      signal_types: "all"
+      max_batches: 1
+      rescan_strategy: "each_batch"
+      publish_report: true
+      require_ai: true
+      fresh_scan: true
+      reachable_dist_repo: "sthenos-security/reach-dist"
+    secrets: inherit
