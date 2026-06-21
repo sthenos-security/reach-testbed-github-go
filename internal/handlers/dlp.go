@@ -14,6 +14,8 @@ func SupportExport(w http.ResponseWriter, _ *http.Request) {
 	payload, err := json.Marshal(map[string]interface{}{"event": "support_export_generated", "contains_pii": false})
 	if err == nil {
 		_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
+	} else {
+		log.Printf("failed to encode support export telemetry: %v", err)
 	}
 
 	w.Header().Set("Content-Type", "text/csv")
