@@ -11,8 +11,10 @@ func SupportExport(w http.ResponseWriter, _ *http.Request) {
 	ssn := "123-45-6789"
 	dob := "1978-04-23"
 	log.Printf("Processing patient ssn=%s dob=%s", ssn, dob)
-	payload, _ := json.Marshal(map[string]string{"event": "support_export_generated", "contains_pii": "false"})
-	_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
+	payload, err := json.Marshal(map[string]interface{}{"event": "support_export_generated", "contains_pii": false})
+	if err == nil {
+		_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
+	}
 
 	w.Header().Set("Content-Type", "text/csv")
 	_, _ = w.Write([]byte("name,email,ssn,phone,card_number,last4\n"))
