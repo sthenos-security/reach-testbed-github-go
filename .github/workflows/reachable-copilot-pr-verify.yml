@@ -74,6 +74,12 @@ jobs:
           ref: refs/pull/${{ env.PR_NUMBER }}/head
           fetch-depth: 1
 
+      - name: Run Go build and tests
+        run: |
+          set -euo pipefail
+          mkdir -p .reachable/ci-artifacts
+          go test ./... 2>&1 | tee .reachable/ci-artifacts/copilot-go-test.log
+
       - name: Setup Reachable
         uses: sthenos-security/reach-ci-github/actions/setup-reachable@v1
         with:
@@ -202,6 +208,32 @@ jobs:
             --pull-request-url "${PR_URL}" \
             --workspace "${GITHUB_WORKSPACE}" \
             --require-copilot-tasks
+
+      - name: Checkout trusted verifier tools
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          path: .reachable/verifier-tools
+          fetch-depth: 1
+
+      - name: Write Copilot remediation audit log
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only \
+            > .reachable/ci-artifacts/copilot-changed-files.txt
+          python3 .reachable/verifier-tools/ci/write-agent-audit-log.py \
+            --lane copilot-github \
+            --artifact-dir .reachable/ci-artifacts \
+            --proof-summary .reachable/ci-artifacts/release-proof/summary.json \
+            --verify-json .reachable/ci-artifacts/copilot-verify-pr.json \
+            --changed-files .reachable/ci-artifacts/copilot-changed-files.txt \
+            --go-test-log .reachable/ci-artifacts/copilot-go-test.log \
+            --pr-number "$PR_NUMBER" \
+            --pr-url "$PR_URL" \
+            --run-url "$run_url" \
+            --repository "$GITHUB_REPOSITORY" \
+            --branch "$PR_HEAD_REF"
 
       - name: Label Copilot verification result
         if: always() && env.PR_NUMBER != ''

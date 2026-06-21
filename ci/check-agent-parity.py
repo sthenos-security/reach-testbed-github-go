@@ -18,6 +18,11 @@ def _find_one(root: Path, pattern: str) -> Path:
     return matches[0]
 
 
+def _find_optional(root: Path, pattern: str) -> Path | None:
+    matches = sorted(root.rglob(pattern))
+    return matches[0] if matches else None
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -101,6 +106,8 @@ def _normalize_copilot(root: Path) -> dict[str, Any]:
     verify_path = _find_one(root, "copilot-verify-pr.json")
     proof_summary_path = _find_one(root, "summary.json")
     verified_db_path = _find_one(root, "copilot-verified-tasks.repo.db")
+    go_test_log_path = _find_optional(root, "copilot-go-test.log")
+    audit_log_path = _find_optional(root, "agent-remediation-audit-log.json")
 
     verify = _load_json_with_prefix_noise(verify_path)
     proof_summary = _load_json(proof_summary_path)
@@ -114,12 +121,31 @@ def _normalize_copilot(root: Path) -> dict[str, Any]:
 
     result = str(verify.get("result") or "")
     evaluation = verify.get("evaluation") if isinstance(verify.get("evaluation"), dict) else {}
+    verification = (
+        proof_summary.get("verification")
+        if isinstance(proof_summary.get("verification"), dict)
+        else {}
+    )
+    totals = proof_summary.get("totals") if isinstance(proof_summary.get("totals"), dict) else {}
+    if verification:
+        proof_status = str(verification.get("status") or "")
+        clean = bool(verification.get("clean"))
+        blocking_results = int(verification.get("blocking_results") or 0)
+    else:
+        blocking_results = int(totals.get("release_blockers") or 0)
+        clean = blocking_results == 0
+        proof_status = "legacy_release_proof" if clean else "legacy_blocking"
+    task_verified = result == "verified" and str(task_row.get("verification_status") or "") == "verified"
     return {
         "lane": "copilot",
         "artifact_root": str(root),
         "verify_path": str(verify_path),
         "summary_path": str(proof_summary_path),
         "verified_db_path": str(verified_db_path),
+        "go_test_log_path": str(go_test_log_path) if go_test_log_path else "",
+        "has_go_test_log": go_test_log_path is not None,
+        "audit_log_path": str(audit_log_path) if audit_log_path else "",
+        "has_audit_log": audit_log_path is not None,
         "repository": repository,
         "branch": str(proof_summary.get("branch") or ""),
         "task_id": str(task_row.get("task_id") or task.get("task_id") or ""),
@@ -129,8 +155,12 @@ def _normalize_copilot(root: Path) -> dict[str, Any]:
         "pr_url": str(task_row.get("pr_url") or task.get("pr_url") or verify.get("pr_url") or ""),
         "verification_run_url": str(task_row.get("verification_run_url") or verify.get("run_url") or ""),
         "result": result,
+        "status": proof_status,
+        "clean": clean,
+        "blocking_results": blocking_results,
         "absent_signal_ids": list(evaluation.get("absent_signal_ids") or []),
-        "ok": result == "verified" and str(task_row.get("verification_status") or "") == "verified",
+        "task_verified": task_verified,
+        "ok": task_verified and clean and blocking_results == 0,
     }
 
 
@@ -164,9 +194,15 @@ def _compare_agents(
         )
     if not copilot["ok"]:
         mismatches.append(
-            f"copilot proof is not verified: state={copilot['state']} "
-            f"verification_status={copilot['verification_status']} result={copilot['result']}"
+            f"copilot proof is not clean and verified: state={copilot['state']} "
+            f"verification_status={copilot['verification_status']} result={copilot['result']} "
+            f"status={copilot['status']} clean={copilot['clean']} "
+            f"blocking_results={copilot['blocking_results']}"
         )
+    if not copilot["has_go_test_log"]:
+        mismatches.append("copilot proof is missing copilot-go-test.log")
+    if not copilot["has_audit_log"]:
+        mismatches.append("copilot proof is missing agent-remediation-audit-log.json")
     if expected_copilot_task_id and copilot["task_id"] != expected_copilot_task_id:
         mismatches.append(
             f"expected Copilot task {expected_copilot_task_id}, saw {copilot['task_id']}"

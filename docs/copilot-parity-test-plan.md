@@ -1,6 +1,7 @@
 # Copilot Parity Test Plan
 
-This document is the active parity tracker for `reach-testbed-github-go`.
+This document is the active design note and parity tracker for
+`reach-testbed-github-go`.
 
 ## Goal
 
@@ -12,7 +13,10 @@ the three supported remediation lanes:
 - `copilot-github`
 
 Parity is measured at the proof level, not at the diff-text level. The patches
-may differ; the validated security outcome must match.
+may differ; the validated security outcome must match. The project goal is not
+"Copilot opened a PR" or "one Copilot task verified"; the goal is high-quality
+Copilot remediation with comparable coverage to Codex and Claude on the same
+baseline.
 
 ## Acceptance Criteria
 
@@ -26,7 +30,14 @@ All of the following must be true before the parity goal is considered complete:
 5. Copilot opens a PR for the dispatched task.
 6. `reachctl copilot verify-pr` marks the Copilot task `verified` from a
    post-fix scan DB.
-7. A parity comparison run reports that all three lanes reached the same
+7. Copilot's post-fix proof artifact shows zero release blockers on the same
+   scope that Codex and Claude cleared.
+8. Copilot's PR verification runs the repository build/test gate and publishes
+   the test log.
+9. Copilot's PR verification publishes a sanitized remediation audit log
+   artifact that records the task, selected signals, changed files, test
+   evidence, and post-fix blocker counts.
+10. A parity comparison run reports that all three lanes reached the same
    verified security outcome.
 
 ## Tracker
@@ -36,8 +47,9 @@ All of the following must be true before the parity goal is considered complete:
 | `reach-testbed-github-go` | Codex proof lane | Codex / complete | Successful remediation run with DB-backed clean proof | `reachable-ci-artifacts` with `release-proof/summary.json` showing zero release blockers | Fresh parity replay run `27912011654` succeeded; artifact `7777713855`; PR `#17`; `release_blockers=0`, `reachable=0` | Keep artifact for parity comparison |
 | `reach-testbed-github-go` | Claude proof lane | Claude / complete | Successful remediation run with DB-backed clean proof | `reachable-ci-artifacts` with `release-proof/summary.json` showing zero release blockers | Fresh parity replay run `27912011701` succeeded; artifact `7777726968`; PR `#18`; `release_blockers=0`, `reachable=0` | Keep artifact for parity comparison |
 | `reach-ci-github` | Copilot dispatch lane | Codex / complete | Copilot lane uses `agent_task`, not `issue_assignment` | Dispatch artifact includes `copilot-tasks.repo.db`, `copilot-dispatch.json`, and `github_task_id` | Fresh Go dispatch proof run `27912011678` created task `rch_task_467353d6ed2309d6` with `github_task_id=791c6b88-8b88-45e2-9272-5b74bba49571` | Use PR `#16` for DB-backed verification |
-| `reach-testbed-github-go` | Copilot PR proof lane | Codex / complete | Copilot PR can be re-scanned and terminally verified from DB evidence | `reachable-copilot-pr-verification` artifact plus `copilot_tasks` terminal row | Fresh verification run `27912272154` succeeded; artifact `7777723020`; task `rch_task_467353d6ed2309d6`, PR `#16`, `verification_status=verified` | Keep artifact for parity comparison |
-| `reach-testbed-github-go` | Cross-agent parity comparison | Codex / complete | Comparator passes for Codex, Claude, and Copilot artifacts from the same parity campaign | `agent-parity-report.json` with `ok=true` | Remote parity workflow run `27912378610` succeeded; artifact `7777743207`; report has `ok=true` and `mismatches=[]` | Keep this campaign as the current acceptance proof |
+| `reach-testbed-github-go` | Copilot PR proof lane | Codex / insufficient | Copilot PR can be re-scanned, build-tested, audit-logged, and terminally verified from DB evidence | `reachable-copilot-pr-verification` artifact plus `copilot-go-test.log`, `agent-remediation-audit-log.json`, `release-proof/summary.json`, and `copilot_tasks` terminal row | Verification run `27912272154` proved task `rch_task_467353d6ed2309d6` on PR `#16`, but stricter local replay reports `blocking_results=17`; the PR only changed `internal/handlers/dlp.go` and did not prove full remediation coverage | Re-run after the verifier includes build/test evidence, audit-log evidence, and post-fix clean proof |
+| `reach-testbed-github-go` | Copilot high-quality remediation coverage | Codex / open | Copilot clears the same actionable release-blocker scope as Codex and Claude, including dependency/module-version remediation where required | Copilot post-fix `release-proof/summary.json` with zero release blockers, plus `agent-remediation-audit-log.json` showing selected signals and changed files | Current Copilot PR `#16` is narrow DLP-only; Codex PR `#17` and Claude PR `#18` addressed broader handler files and `go.mod`/`go.sum` | Broaden Copilot dispatch/campaign until coverage matches Codex and Claude outcomes |
+| `reach-testbed-github-go` | Cross-agent parity comparison | Codex / insufficient | Comparator passes for Codex, Claude, and Copilot artifacts from the same parity campaign, with all three post-fix proofs clean | `agent-parity-report.json` and aggregate `agent-remediation-audit-log.json` with `ok=true`, zero Copilot `blocking_results`, and no mismatches | Run `27912378610` passed under the old narrow rule; local replay with the strict comparator fails because Copilot is `task_verified=true` but `clean=false`, `blocking_results=17` | Re-run parity after the stricter comparator is in place |
 | `reach-testbed-github-go` | Trusted Copilot verification dispatcher | Codex / complete | A trusted `main` workflow finds Copilot PRs and dispatches `Verify Copilot PR` without loosening public PR approval policy | Successful `Dispatch Copilot PR Verification` run and successful spawned verifier for an `app/copilot-swe-agent` PR | Dispatcher run `27913235873` started verifier run `27913239123`; verifier succeeded and artifact `7778016209` has `verification_status=verified`; fixed dispatcher run `27913328451` succeeded and skipped PR `#16` because it found that verification artifact | Keep strict PR-event approval policy; use dispatcher for Copilot PR verification automation |
 
 ## Live Campaign - 2026-06-21
@@ -48,8 +60,8 @@ All of the following must be true before the parity goal is considered complete:
 | Claude | `Run Demo (Claude)` | `27912011701` | Complete | `reachable-ci-artifacts/release-proof/summary.json` clean DB-backed proof | Artifact `7777726968`; PR `#18`; `release_blockers=0`, `reachable=0` |
 | Copilot dispatch | `Run Demo (Copilot Dispatch)` | `27912011678` | Complete | `copilot-dispatch.json` with `dispatch_kind=agent_task` plus `copilot-tasks.repo.db` | Fresh artifact proves task `rch_task_467353d6ed2309d6`, `dispatch_kind=agent_task`, `github_task_id=791c6b88-8b88-45e2-9272-5b74bba49571` |
 | Copilot cloud agent | `Copilot cloud agent` | `27912164940` | Complete | Successful Copilot task processing and PR authored by `app/copilot-swe-agent` | Opened PR `#16`, branch `copilot/rch-task-467353d6ed2309d6-remediate-dlp-again` |
-| Copilot verification | `Verify Copilot PR` | `27912272154` | Complete | `reachable-copilot-pr-verification` with task row `verification_status=verified` | Artifact `7777723020`; task `rch_task_467353d6ed2309d6`, PR `#16`, result `verified` |
-| Parity comparison | `Agent Parity Check` | `27912378610` | Complete | `reachable-agent-parity-report/agent-parity-report.json` with `ok=true` | Artifact `7777743207`; report has `ok=true`, `mismatches=[]`, Codex run `27912011654`, Claude run `27912011701`, Copilot verification run `27912272154` |
+| Copilot verification | `Verify Copilot PR` | `27912272154` | Insufficient | `reachable-copilot-pr-verification` with task row `verification_status=verified`, build/test log, audit log, and clean post-fix proof | Artifact `7777723020`; task `rch_task_467353d6ed2309d6`, PR `#16`, result `verified`; coverage was DLP-only |
+| Parity comparison | `Agent Parity Check` | `27912378610` | Insufficient | `reachable-agent-parity-report/agent-parity-report.json` and aggregate audit log with `ok=true` under the strict clean-Copilot rule | Artifact `7777743207` passed the old rule; that proof is retired as a final parity claim |
 
 ## Required Run Set
 
@@ -60,7 +72,10 @@ The parity campaign should use the following sequence:
 3. Run `Run Demo (Copilot Dispatch)` against `main`.
 4. Wait for the corresponding `Copilot cloud agent` PR.
 5. Run `Verify Copilot PR` against that PR and dispatch run.
-6. Run `Agent Parity Check` with the four resulting run IDs.
+6. If Copilot only fixes a subset of the release blockers, dispatch additional
+   Copilot tasks or a broader Copilot campaign until the post-fix proof is
+   clean.
+7. Run `Agent Parity Check` with the final clean run IDs.
 
 ## Artifact Contract
 
@@ -75,9 +90,17 @@ The parity workflow compares proof artifacts, not commits:
   - `copilot-tasks.repo.db`
 - Copilot verification:
   - `reachable-copilot-pr-verification`
+  - `copilot-go-test.log`
+  - `agent-remediation-audit-log.json`
+  - `agent-remediation-audit-log.md`
   - `copilot-verify-pr.json`
   - `copilot-verified-tasks.repo.db`
   - `release-proof/summary.json`
+- Parity comparison:
+  - `reachable-agent-parity-report`
+  - `agent-parity-report.json`
+  - `agent-remediation-audit-log.json`
+  - `agent-remediation-audit-log.md`
 
 ## Comparison Rules
 
@@ -87,7 +110,10 @@ The parity workflow must pass only when:
 2. Codex proof is clean.
 3. Claude proof is clean.
 4. Copilot verification status is `verified`.
-5. Optional expected Copilot task / PR inputs, when provided, match the proof.
+5. Copilot post-fix proof is clean with zero release blockers.
+6. Copilot verification includes `copilot-go-test.log`.
+7. Copilot verification includes `agent-remediation-audit-log.json`.
+8. Optional expected Copilot task / PR inputs, when provided, match the proof.
 
 The workflow does not require identical:
 
@@ -97,7 +123,7 @@ The workflow does not require identical:
 - PR titles
 - internal coding style
 
-## Current Known Good Copilot Evidence
+## Historical Narrow Copilot Evidence
 
 - Dispatch run: `27908810746`
 - Copilot task: `rch_task_467353d6ed2309d6`
@@ -105,3 +131,7 @@ The workflow does not require identical:
 - Copilot PR: `#12`
 - Verification run: `27909000069`
 - Verification result: `verified`
+
+This evidence is useful for proving the asynchronous Copilot task flow, but it
+is not sufficient for the current parity goal because it does not prove full
+remediation coverage.

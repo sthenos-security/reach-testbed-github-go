@@ -88,11 +88,26 @@ jobs:
             "${expected_pr_args[@]}" \
             --output parity/agent-parity-report.json
 
+      - name: Write parity audit log
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ ! -f parity/agent-parity-report.json ]; then
+            echo "No parity report was produced; skipping audit log." >&2
+            exit 0
+          fi
+          python3 ci/write-agent-audit-log.py \
+            --parity-report parity/agent-parity-report.json \
+            --output-dir parity
+
       - name: Upload parity report
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: reachable-agent-parity-report
-          path: parity/agent-parity-report.json
+          path: |
+            parity/agent-parity-report.json
+            parity/agent-remediation-audit-log.json
+            parity/agent-remediation-audit-log.md
           if-no-files-found: error
           retention-days: 14
