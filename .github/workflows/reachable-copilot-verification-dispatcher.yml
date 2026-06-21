@@ -90,8 +90,66 @@ jobs:
             exit 0
           fi
 
+          already_verified() {
+            local pr_number="$1"
+            local run_id
+            while IFS= read -r run_id; do
+              [ -n "$run_id" ] || continue
+              rm -rf verify-artifacts
+              mkdir -p verify-artifacts
+              if ! gh run download "$run_id" \
+                --repo "$GITHUB_REPOSITORY" \
+                --name reachable-copilot-pr-verification \
+                --dir verify-artifacts >/dev/null 2>&1; then
+                continue
+              fi
+              summary_json="$(find verify-artifacts -path '*/release-proof/summary.json' -type f | head -n 1 || true)"
+              verify_json="$(find verify-artifacts -name copilot-verify-pr.json -type f | head -n 1 || true)"
+              if [ -z "$summary_json" ] || [ -z "$verify_json" ]; then
+                continue
+              fi
+              if python3 - "$summary_json" "$verify_json" "$pr_number" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          summary_path, verify_path, pr_number = sys.argv[1:]
+          summary = json.loads(Path(summary_path).read_text(encoding="utf-8"))
+          if not str(summary.get("pull_request_url") or "").rstrip("/").endswith(f"/pull/{pr_number}"):
+              raise SystemExit(1)
+          raw = Path(verify_path).read_text(encoding="utf-8")
+          decoder = json.JSONDecoder()
+          for index, char in enumerate(raw):
+              if char != "{":
+                  continue
+              try:
+                  payload, _ = decoder.raw_decode(raw[index:])
+              except json.JSONDecodeError:
+                  continue
+              if payload.get("result") == "verified":
+                  raise SystemExit(0)
+          raise SystemExit(1)
+          PY
+              then
+                echo "PR #${pr_number} already has a successful REACHABLE verification artifact from run ${run_id}."
+                return 0
+              fi
+            done < <(
+              gh run list \
+                --repo "$GITHUB_REPOSITORY" \
+                --workflow "Verify Copilot PR" \
+                --limit 40 \
+                --json databaseId,event,status,conclusion \
+                --jq '.[] | select(.event == "workflow_dispatch" and .status == "completed" and .conclusion == "success") | .databaseId'
+            )
+            return 1
+          }
+
           while IFS=$'\t' read -r pr_number head_ref; do
             [ -n "$pr_number" ] || continue
+            if [ "${FORCE_DISPATCH}" != "true" ] && already_verified "$pr_number"; then
+              continue
+            fi
             task_suffix="$(python3 - "$head_ref" <<'PY'
           import re
           import sys
@@ -152,5 +210,5 @@ jobs:
                 -f "pr_number=${pr_number}" \
                 -f "dispatch_run_id="
             fi
-            gh pr edit "$pr_number" --repo "$GITHUB_REPOSITORY" --add-label "$REQUESTED_LABEL"
+            gh pr edit "$pr_number" --repo "$GITHUB_REPOSITORY" --add-label "$REQUESTED_LABEL" || true
           done < copilot-prs.tsv

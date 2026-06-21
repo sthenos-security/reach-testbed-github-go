@@ -178,7 +178,7 @@ release blockers, and publishes proof for that branch.
 | `Run Demo (Copilot Dispatch)` | Async GitHub Copilot cloud-agent dispatch workflow. It scans and creates Copilot tasks; a later verification pass decides whether Copilot PRs are ready. |
 | `Run Demo (Copilot E2E)` | Proof-gated Copilot dispatch workflow. It consumes the GitHub toolkit from this demo repo and verifies the artifact contains non-empty Copilot dispatch proof. |
 | `Run Demo (Copilot Alpha Candidate)` | Proof-gated Copilot dispatch workflow against a two-wheel, non-published reach-core alpha candidate artifact. |
-| `Dispatch Copilot PR Verification` | Finds open `app/copilot-swe-agent` PRs from trusted `main` context and dispatches `Verify Copilot PR`; labels PRs after verification is requested or completed. |
+| `Dispatch Copilot PR Verification` | Finds open `app/copilot-swe-agent` PRs from trusted `main` context and dispatches `Verify Copilot PR`; skips already verified PRs from verification artifacts. |
 | `Agent Parity Check` | Downloads Codex, Claude, and Copilot proof artifacts from supplied run IDs and fails unless all three lanes reach the same verified security outcome. |
 | `Reset Demo` | Deletes old `reachable-remediate-*` branches when resetting the demo. Use `dry_run=true` first if you want to preview. |
 | `pages-build-deployment` | Publish Verdict Status Page. This is GitHub Pages plumbing. Do not run it manually; it appears after `Run Demo` publishes results. |
@@ -191,7 +191,7 @@ for Claude. Copilot dispatch lives in [.github/workflows/reachable-remediate-cop
 the proof-gated toolkit-backed Copilot workflow is [.github/workflows/reachable-remediate-copilot-e2e.yml](.github/workflows/reachable-remediate-copilot-e2e.yml),
 and the non-published alpha-candidate Copilot workflow is [.github/workflows/reachable-copilot-alpha-candidate.yml](.github/workflows/reachable-copilot-alpha-candidate.yml).
 Trusted Copilot PR verification dispatch is handled by [.github/workflows/reachable-copilot-verification-dispatcher.yml](.github/workflows/reachable-copilot-verification-dispatcher.yml)
-and records verification labels through [.github/workflows/reachable-copilot-pr-verify.yml](.github/workflows/reachable-copilot-pr-verify.yml).
+and DB-backed verification is recorded by [.github/workflows/reachable-copilot-pr-verify.yml](.github/workflows/reachable-copilot-pr-verify.yml).
 Cross-agent parity comparison is tracked in [docs/copilot-parity-test-plan.md](docs/copilot-parity-test-plan.md)
 and executed by [.github/workflows/reachable-agent-parity.yml](.github/workflows/reachable-agent-parity.yml)
 with [ci/check-agent-parity.py](ci/check-agent-parity.py).
