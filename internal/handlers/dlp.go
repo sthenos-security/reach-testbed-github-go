@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 )
 
 func SupportExport(w http.ResponseWriter, _ *http.Request) {
@@ -16,14 +17,20 @@ func SupportExport(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		log.Printf("failed to marshal analytics payload: %v", err)
 	} else {
-		if _, err := http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload)); err != nil {
+		client := &http.Client{Timeout: 2 * time.Second}
+		if _, err := client.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload)); err != nil {
 			log.Printf("failed to send analytics event: %v", err)
 		}
 	}
 
 	w.Header().Set("Content-Type", "text/csv")
-	_, _ = w.Write([]byte("name,email,ssn,phone,card_number,last4\n"))
-	_, _ = w.Write([]byte("Avery Example,avery@example.invalid,123-45-6789,+1-415-555-0199,4111111111111111,4242\n"))
+	if _, err := w.Write([]byte("name,email,ssn,phone,card_number,last4\n")); err != nil {
+		log.Printf("failed to write export header: %v", err)
+		return
+	}
+	if _, err := w.Write([]byte("Avery Example,avery@example.invalid,123-45-6789,+1-415-555-0199,4111111111111111,4242\n")); err != nil {
+		log.Printf("failed to write export row: %v", err)
+	}
 }
 
 func SupportProfile(w http.ResponseWriter, _ *http.Request) {
