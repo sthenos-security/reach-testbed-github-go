@@ -40,6 +40,7 @@ workflows so the provider lane is obvious in the Actions UI:
 - [GitHub Actions → Run Demo (Copilot Dispatch)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-copilot.yml)
 - [GitHub Actions → Run Demo (Copilot E2E)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-copilot-e2e.yml)
 - [GitHub Actions → Run Demo (Copilot Alpha Candidate)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-copilot-alpha-candidate.yml)
+- [GitHub Actions → Dispatch Copilot PR Verification](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-copilot-verification-dispatcher.yml)
 - [GitHub Actions → Agent Parity Check](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-agent-parity.yml)
 
 This repo is also the public scan-only sample surface. There is no separate
@@ -55,6 +56,7 @@ workflow here with `remediate=false`.
 | `Run Demo (Copilot Dispatch)` | Scan the vulnerable release candidate and dispatch bounded GitHub Copilot cloud-agent issues/tasks from DB-backed evidence. Copilot PRs require later REACHABLE verification before they are considered ready. | Yes |
 | `Run Demo (Copilot E2E)` | Run the proof-gated Copilot demo from this Go repo and fail unless the published artifact contains at least one dispatched Copilot task with a GitHub issue/task identifier. | Yes |
 | `Run Demo (Copilot Alpha Candidate)` | Install a non-published reach-core Test Release candidate dist directly and prove Copilot dispatch from this Go repo before any Marketplace rollout. | Yes |
+| `Dispatch Copilot PR Verification` | Trusted scheduled/manual workflow that finds open Copilot PRs and dispatches `Verify Copilot PR` from `main`, avoiding PR-event approval gates for bot-authored PRs. | Yes |
 | `Agent Parity Check` | Compare Codex, Claude, and Copilot proof artifacts by verified security outcome instead of diff text. | Yes |
 | `Reset Demo` | Delete old `reachable-remediate-*` demo branches before a fresh run. | Optional |
 | `pages-build-deployment` | Publish Verdict Status Page. This is GitHub Pages plumbing created automatically after `Run Demo` publishes results. | No |
@@ -176,6 +178,7 @@ release blockers, and publishes proof for that branch.
 | `Run Demo (Copilot Dispatch)` | Async GitHub Copilot cloud-agent dispatch workflow. It scans and creates Copilot tasks; a later verification pass decides whether Copilot PRs are ready. |
 | `Run Demo (Copilot E2E)` | Proof-gated Copilot dispatch workflow. It consumes the GitHub toolkit from this demo repo and verifies the artifact contains non-empty Copilot dispatch proof. |
 | `Run Demo (Copilot Alpha Candidate)` | Proof-gated Copilot dispatch workflow against a two-wheel, non-published reach-core alpha candidate artifact. |
+| `Dispatch Copilot PR Verification` | Finds open `app/copilot-swe-agent` PRs from trusted `main` context and dispatches `Verify Copilot PR`; labels PRs after verification is requested or completed. |
 | `Agent Parity Check` | Downloads Codex, Claude, and Copilot proof artifacts from supplied run IDs and fails unless all three lanes reach the same verified security outcome. |
 | `Reset Demo` | Deletes old `reachable-remediate-*` branches when resetting the demo. Use `dry_run=true` first if you want to preview. |
 | `pages-build-deployment` | Publish Verdict Status Page. This is GitHub Pages plumbing. Do not run it manually; it appears after `Run Demo` publishes results. |
@@ -187,6 +190,8 @@ for Codex and [.github/workflows/reachable-remediate-claude.yml](.github/workflo
 for Claude. Copilot dispatch lives in [.github/workflows/reachable-remediate-copilot.yml](.github/workflows/reachable-remediate-copilot.yml),
 the proof-gated toolkit-backed Copilot workflow is [.github/workflows/reachable-remediate-copilot-e2e.yml](.github/workflows/reachable-remediate-copilot-e2e.yml),
 and the non-published alpha-candidate Copilot workflow is [.github/workflows/reachable-copilot-alpha-candidate.yml](.github/workflows/reachable-copilot-alpha-candidate.yml).
+Trusted Copilot PR verification dispatch is handled by [.github/workflows/reachable-copilot-verification-dispatcher.yml](.github/workflows/reachable-copilot-verification-dispatcher.yml)
+and records verification labels through [.github/workflows/reachable-copilot-pr-verify.yml](.github/workflows/reachable-copilot-pr-verify.yml).
 Cross-agent parity comparison is tracked in [docs/copilot-parity-test-plan.md](docs/copilot-parity-test-plan.md)
 and executed by [.github/workflows/reachable-agent-parity.yml](.github/workflows/reachable-agent-parity.yml)
 with [ci/check-agent-parity.py](ci/check-agent-parity.py).

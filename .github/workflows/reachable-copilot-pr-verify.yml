@@ -19,6 +19,7 @@ on:
 permissions:
   actions: read
   contents: read
+  issues: write
   pull-requests: read
   security-events: write
 
@@ -201,6 +202,42 @@ jobs:
             --pull-request-url "${PR_URL}" \
             --workspace "${GITHUB_WORKSPACE}" \
             --require-copilot-tasks
+
+      - name: Label Copilot verification result
+        if: always() && env.PR_NUMBER != ''
+        run: |
+          set -euo pipefail
+          verified_label="reachable-copilot-verified"
+          failed_label="reachable-copilot-verification-failed"
+          requested_label="reachable-verification-requested"
+          gh label create "$verified_label" --repo "$GITHUB_REPOSITORY" --color 2da44e --description "REACHABLE verified this Copilot PR" >/dev/null 2>&1 || true
+          gh label create "$failed_label" --repo "$GITHUB_REPOSITORY" --color cf222e --description "REACHABLE could not verify this Copilot PR" >/dev/null 2>&1 || true
+          gh label create "$requested_label" --repo "$GITHUB_REPOSITORY" --color 0969da --description "REACHABLE verification was dispatched for this Copilot PR" >/dev/null 2>&1 || true
+          if [ ! -f .reachable/ci-artifacts/copilot-verify-pr.json ]; then
+            gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label "$failed_label" || true
+            exit 0
+          fi
+          result="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          raw = Path(".reachable/ci-artifacts/copilot-verify-pr.json").read_text(encoding="utf-8")
+          decoder = json.JSONDecoder()
+          for index, char in enumerate(raw):
+              if char != "{":
+                  continue
+              try:
+                  payload, _ = decoder.raw_decode(raw[index:])
+              except json.JSONDecodeError:
+                  continue
+              print(str(payload.get("result") or ""))
+              break
+          PY
+          )"
+          if [ "$result" = "verified" ]; then
+            gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label "$verified_label" || true
+          else
+            gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label "$failed_label" || true
+          fi
 
       - name: Upload Copilot verification artifacts
         if: always()

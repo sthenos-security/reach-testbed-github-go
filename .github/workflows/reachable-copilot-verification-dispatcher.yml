@@ -1,0 +1,156 @@
+name: "Dispatch Copilot PR Verification"
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Optional single Copilot PR number to verify
+        type: string
+        default: ""
+      force:
+        description: Dispatch even if the PR already has a REACHABLE verification label
+        type: boolean
+        default: false
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  dispatch-copilot-pr-verification:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FORCE_DISPATCH: ${{ inputs.force || false }}
+      PR_NUMBER: ${{ inputs.pr_number || '' }}
+      REQUESTED_LABEL: reachable-verification-requested
+      VERIFIED_LABEL: reachable-copilot-verified
+      FAILED_LABEL: reachable-copilot-verification-failed
+    steps:
+      - name: Resolve and dispatch Copilot PR verification
+        run: |
+          set -euo pipefail
+
+          gh label create "$REQUESTED_LABEL" \
+            --repo "$GITHUB_REPOSITORY" \
+            --color 0969da \
+            --description "REACHABLE verification was dispatched for this Copilot PR" >/dev/null 2>&1 || true
+          gh label create "$VERIFIED_LABEL" \
+            --repo "$GITHUB_REPOSITORY" \
+            --color 2da44e \
+            --description "REACHABLE verified this Copilot PR" >/dev/null 2>&1 || true
+          gh label create "$FAILED_LABEL" \
+            --repo "$GITHUB_REPOSITORY" \
+            --color cf222e \
+            --description "REACHABLE could not verify this Copilot PR" >/dev/null 2>&1 || true
+
+          pr_json_path="$(mktemp)"
+          if [ -n "${PR_NUMBER}" ]; then
+            gh pr view "$PR_NUMBER" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json number,author,headRefName,labels,state \
+              --jq '[.]' > "$pr_json_path"
+          else
+            gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --state open \
+              --json number,author,headRefName,labels,state > "$pr_json_path"
+          fi
+
+          python3 - "$pr_json_path" "$REQUESTED_LABEL" "$VERIFIED_LABEL" "$FAILED_LABEL" "$FORCE_DISPATCH" <<'PY' > copilot-prs.tsv
+          import json
+          import sys
+
+          path, requested, verified, failed, force_raw = sys.argv[1:]
+          force = str(force_raw).lower() == "true"
+          prs = json.load(open(path, encoding="utf-8"))
+          for pr in prs:
+              labels = {item.get("name") for item in pr.get("labels", []) if isinstance(item, dict)}
+              number = pr.get("number")
+              author = ((pr.get("author") or {}).get("login") or "")
+              head = pr.get("headRefName") or ""
+              state = pr.get("state") or ""
+              if state and state.upper() != "OPEN":
+                  continue
+              if author != "app/copilot-swe-agent":
+                  continue
+              if not head.startswith("copilot/rch-task-"):
+                  continue
+              if not force and (requested in labels or verified in labels or failed in labels):
+                  continue
+              print(f"{number}\t{head}")
+          PY
+
+          if [ ! -s copilot-prs.tsv ]; then
+            echo "No Copilot PRs need REACHABLE verification dispatch."
+            exit 0
+          fi
+
+          while IFS=$'\t' read -r pr_number head_ref; do
+            [ -n "$pr_number" ] || continue
+            task_suffix="$(python3 - "$head_ref" <<'PY'
+          import re
+          import sys
+          match = re.search(r"rch-task-([0-9a-f]+)", sys.argv[1])
+          print(match.group(1) if match else "")
+          PY
+          )"
+            dispatch_run_id=""
+            if [ -n "$task_suffix" ]; then
+              while IFS= read -r run_id; do
+                [ -n "$run_id" ] || continue
+                rm -rf dispatch-artifacts
+                mkdir -p dispatch-artifacts
+                if ! gh run download "$run_id" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --name reachable-ci-artifacts \
+                  --dir dispatch-artifacts >/dev/null 2>&1; then
+                  continue
+                fi
+                dispatch_json="$(find dispatch-artifacts -name copilot-dispatch.json -type f | head -n 1 || true)"
+                if [ -z "$dispatch_json" ]; then
+                  continue
+                fi
+                if python3 - "$dispatch_json" "$task_suffix" <<'PY'
+          import json
+          import sys
+          payload = json.load(open(sys.argv[1], encoding="utf-8"))
+          suffix = sys.argv[2]
+          if any(str(task.get("task_id") or "").endswith(suffix) for task in payload.get("tasks") or []):
+              raise SystemExit(0)
+          raise SystemExit(1)
+          PY
+                then
+                  dispatch_run_id="$run_id"
+                  break
+                fi
+              done < <(
+                gh run list \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --workflow "Run Demo (Copilot Dispatch)" \
+                  --limit 40 \
+                  --json databaseId \
+                  --jq '.[].databaseId'
+              )
+            fi
+
+            echo "Dispatching REACHABLE Copilot verification for PR #${pr_number} using dispatch run ${dispatch_run_id:-<auto-discover>}."
+            if [ -n "$dispatch_run_id" ]; then
+              gh workflow run reachable-copilot-pr-verify.yml \
+                --repo "$GITHUB_REPOSITORY" \
+                --ref main \
+                -f "pr_number=${pr_number}" \
+                -f "dispatch_run_id=${dispatch_run_id}"
+            else
+              gh workflow run reachable-copilot-pr-verify.yml \
+                --repo "$GITHUB_REPOSITORY" \
+                --ref main \
+                -f "pr_number=${pr_number}" \
+                -f "dispatch_run_id="
+            fi
+            gh pr edit "$pr_number" --repo "$GITHUB_REPOSITORY" --add-label "$REQUESTED_LABEL"
+          done < copilot-prs.tsv
