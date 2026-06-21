@@ -105,6 +105,13 @@ jobs:
           mkdir -p .reachable/ci-artifacts
           repo_db="$(python -c 'from reachable.ci.proof_page import find_latest_repo_db; print(find_latest_repo_db())')"
           echo "REACHABLE_REPO_DB=${repo_db}" >> "$GITHUB_ENV"
+          reachctl remediate . \
+            --context ci \
+            --output-dir .reachable/remediation-bundle \
+            --agent copilot \
+            --mode branch \
+            --profile balanced \
+            --all
           cp "$repo_db" .reachable/ci-artifacts/copilot-tasks.repo.db
           reachctl copilot doctor \
             --repo "${GITHUB_REPOSITORY}" \
@@ -112,9 +119,9 @@ jobs:
             --json > .reachable/ci-artifacts/copilot-doctor.json
           reachctl copilot dispatch \
             --repo-db "$repo_db" \
+            --bundle .reachable/remediation-bundle/bundle.json \
             --repo "${GITHUB_REPOSITORY}" \
             --mode reachable-high \
-            --max-tasks 1 \
             --base-ref "${{ inputs.target_branch }}" \
             --dispatch-kind agent_task \
             --json > .reachable/ci-artifacts/copilot-dispatch.json
