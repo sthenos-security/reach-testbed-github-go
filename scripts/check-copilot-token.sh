@@ -151,8 +151,10 @@ for key in ("enabled_repositories", "selected_repositories_url"):
 PY
 else
   echo "WARN token cannot read org Copilot Coding Agent permissions (HTTP $org_code)"
+  echo "INFO repo-scoped token checks already passed; this warning only means the PAT cannot inspect org-level Copilot policy."
   show_body org_permissions
 fi
 
-echo "Non-mutating token checks passed."
-echo "If reachctl copilot dispatch still fails with HTTP 409, GitHub accepted the token but has not enabled Copilot Coding Agent task creation for this user/repo/org."
+echo "Repo-scoped non-mutating token checks passed."
+echo "This script does not prove org-level Cloud agent policy, and it does not attempt a mutating create-task call."
+echo "If reachctl copilot dispatch still fails with HTTP 409, GitHub accepted the token but is still rejecting Copilot task creation for this user/repo/org."
