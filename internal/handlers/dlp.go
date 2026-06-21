@@ -28,8 +28,9 @@ func SupportExport(w http.ResponseWriter, _ *http.Request) {
 		log.Printf("failed to write export header: %v", err)
 		return
 	}
-	if _, err := w.Write([]byte("Avery Example,avery@example.invalid,123-45-6789,+1-415-555-0199,4111111111111111,4242\n")); err != nil {
+	if _, err := w.Write([]byte("Avery Example,avery@example.invalid,redacted,redacted,redacted,4242\n")); err != nil {
 		log.Printf("failed to write export row: %v", err)
+		return
 	}
 }
 
