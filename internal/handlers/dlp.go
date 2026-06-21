@@ -16,10 +16,11 @@ func SupportExport(w http.ResponseWriter, _ *http.Request) {
 		log.Printf("failed to marshal analytics payload: %v", err)
 	} else {
 		resp, postErr := http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
 		if postErr != nil {
 			log.Printf("failed to send analytics payload: %v", postErr)
-		} else if resp != nil && resp.Body != nil {
-			_ = resp.Body.Close()
 		}
 	}
 
