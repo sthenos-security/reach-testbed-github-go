@@ -11,11 +11,11 @@ func SupportExport(w http.ResponseWriter, _ *http.Request) {
 	ssn := "123-45-6789"
 	dob := "1978-04-23"
 	log.Printf("Processing patient ssn=%s dob=%s", ssn, dob)
-	payload, err := json.Marshal(map[string]interface{}{"event": "support_export_generated", "contains_pii": false})
+	payload, err := json.Marshal(map[string]interface{}{"event": "support_export_generated", "contains_pii": true})
 	if err == nil {
 		_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
 	} else {
-		log.Printf("failed to encode support export telemetry: %v", err)
+		log.Printf("failed to marshal analytics payload: %v", err)
 	}
 
 	w.Header().Set("Content-Type", "text/csv")
