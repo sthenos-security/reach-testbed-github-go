@@ -1,0 +1,98 @@
+name: "Agent Parity Check"
+
+on:
+  workflow_dispatch:
+    inputs:
+      codex_run_id:
+        description: Successful `Run Demo (Codex)` run ID
+        type: string
+        required: true
+      claude_run_id:
+        description: Successful `Run Demo (Claude)` run ID
+        type: string
+        required: true
+      copilot_verify_run_id:
+        description: Successful `Verify Copilot PR` run ID
+        type: string
+        required: true
+      expected_repository:
+        description: Expected repository owner/name
+        type: string
+        default: "sthenos-security/reach-testbed-github-go"
+      expected_copilot_task_id:
+        description: Optional expected Copilot task ID
+        type: string
+        default: ""
+      expected_copilot_pr:
+        description: Optional expected Copilot PR number
+        type: string
+        default: ""
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  compare-proof-artifacts:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download Codex artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p parity/codex
+          gh run download "${{ inputs.codex_run_id }}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name reachable-ci-artifacts \
+            --dir parity/codex
+
+      - name: Download Claude artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p parity/claude
+          gh run download "${{ inputs.claude_run_id }}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name reachable-ci-artifacts \
+            --dir parity/claude
+
+      - name: Download Copilot verification artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p parity/copilot
+          gh run download "${{ inputs.copilot_verify_run_id }}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name reachable-copilot-pr-verification \
+            --dir parity/copilot
+
+      - name: Compare parity outcomes
+        run: |
+          set -euo pipefail
+          expected_pr_args=()
+          if [ -n "${{ inputs.expected_copilot_pr }}" ]; then
+            expected_pr_args+=(--expected-copilot-pr "${{ inputs.expected_copilot_pr }}")
+          fi
+          expected_task_args=()
+          if [ -n "${{ inputs.expected_copilot_task_id }}" ]; then
+            expected_task_args+=(--expected-copilot-task-id "${{ inputs.expected_copilot_task_id }}")
+          fi
+          python3 ci/check-agent-parity.py \
+            --codex-artifact-dir parity/codex \
+            --claude-artifact-dir parity/claude \
+            --copilot-artifact-dir parity/copilot \
+            --expected-repository "${{ inputs.expected_repository }}" \
+            "${expected_task_args[@]}" \
+            "${expected_pr_args[@]}" \
+            --output parity/agent-parity-report.json
+
+      - name: Upload parity report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: reachable-agent-parity-report
+          path: parity/agent-parity-report.json
+          if-no-files-found: error
+          retention-days: 14
