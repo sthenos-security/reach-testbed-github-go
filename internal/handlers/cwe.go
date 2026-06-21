@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"os/exec"
 
@@ -9,9 +10,18 @@ import (
 
 func DiagnosticPing(w http.ResponseWriter, r *http.Request) {
 	host := r.URL.Query().Get("host")
-	out, err := exec.Command("sh", "-c", "ping -c 1 "+host).CombinedOutput()
+	if !safety.AllowedHostname(host) {
+		http.Error(w, "invalid host", http.StatusBadRequest)
+		return
+	}
+
+	out, err := exec.Command("ping", "-c", "1", host).CombinedOutput()
 	if err != nil {
-		http.Error(w, string(out), http.StatusBadGateway)
+		logHandlerError("DiagnosticPing ping failed", err)
+		if len(out) > 0 {
+			log.Printf("DiagnosticPing output: %s", string(out))
+		}
+		writeInternalError(w, "DiagnosticPing", err)
 		return
 	}
 
@@ -27,7 +37,11 @@ func SafeDiagnosticPing(w http.ResponseWriter, r *http.Request) {
 
 	out, err := exec.Command("ping", "-c", "1", host).CombinedOutput()
 	if err != nil {
-		http.Error(w, string(out), http.StatusBadGateway)
+		logHandlerError("SafeDiagnosticPing ping failed", err)
+		if len(out) > 0 {
+			log.Printf("SafeDiagnosticPing output: %s", string(out))
+		}
+		writeInternalError(w, "SafeDiagnosticPing", err)
 		return
 	}
 
