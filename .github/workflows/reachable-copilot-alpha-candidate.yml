@@ -105,6 +105,7 @@ jobs:
           mkdir -p .reachable/ci-artifacts
           repo_db="$(python -c 'from reachable.ci.proof_page import find_latest_repo_db; print(find_latest_repo_db())')"
           echo "REACHABLE_REPO_DB=${repo_db}" >> "$GITHUB_ENV"
+          cp "$repo_db" .reachable/ci-artifacts/copilot-tasks.repo.db
           reachctl copilot doctor \
             --repo "${GITHUB_REPOSITORY}" \
             --dispatch-kind agent_task \
@@ -117,6 +118,7 @@ jobs:
             --base-ref "${{ inputs.target_branch }}" \
             --dispatch-kind agent_task \
             --json > .reachable/ci-artifacts/copilot-dispatch.json
+          cp "$repo_db" .reachable/ci-artifacts/copilot-tasks.repo.db
           python3 - <<'PY'
           import json
           from pathlib import Path

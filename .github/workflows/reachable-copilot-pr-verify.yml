@@ -1,0 +1,212 @@
+name: "Verify Copilot PR"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Copilot pull request number to verify
+        type: string
+        required: true
+      dispatch_run_id:
+        description: Optional dispatch workflow run ID that uploaded reachable-ci-artifacts
+        type: string
+        default: ""
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+  security-events: write
+
+jobs:
+  verify-copilot-pr:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login == 'app/copilot-swe-agent' }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DISPATCH_RUN_ID: ${{ github.event.inputs.dispatch_run_id || '' }}
+    steps:
+      - name: Resolve Copilot PR metadata
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            pr_number="${{ github.event.pull_request.number }}"
+          else
+            pr_number="${{ github.event.inputs.pr_number }}"
+          fi
+          if [ -z "$pr_number" ]; then
+            echo "pr_number is required." >&2
+            exit 2
+          fi
+          pr_json="$(gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" --json number,url,headRefName,author)"
+          echo "$pr_json" > pr.json
+          author="$(python3 - <<'PY'
+          import json
+          print(json.load(open("pr.json"))["author"]["login"])
+          PY
+          )"
+          if [ "$author" != "app/copilot-swe-agent" ]; then
+            echo "PR #${pr_number} author is ${author}, not app/copilot-swe-agent." >&2
+            exit 2
+          fi
+          {
+            echo "PR_NUMBER=${pr_number}"
+            echo "PR_URL=$(python3 - <<'PY'
+          import json
+          print(json.load(open("pr.json"))["url"])
+          PY
+          )"
+            echo "PR_HEAD_REF=$(python3 - <<'PY'
+          import json
+          print(json.load(open("pr.json"))["headRefName"])
+          PY
+          )"
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout Copilot PR branch
+        uses: actions/checkout@v5
+        with:
+          ref: refs/pull/${{ env.PR_NUMBER }}/head
+          fetch-depth: 1
+
+      - name: Setup Reachable
+        uses: sthenos-security/reach-ci-github/actions/setup-reachable@v1
+        with:
+          dist-repo: sthenos-security/reach-dist
+          fresh-scan: true
+
+      - name: Download dispatch task DB artifact
+        run: |
+          set -euo pipefail
+          rm -rf dispatch-search dispatch-artifacts
+          mkdir -p dispatch-search dispatch-artifacts
+
+          task_suffix="$(python3 - <<'PY'
+          import os
+          import re
+          head = os.environ.get("PR_HEAD_REF", "")
+          match = re.search(r"rch-task-([0-9a-f]+)", head)
+          print(match.group(1) if match else "")
+          PY
+          )"
+          echo "Looking for dispatch artifact for task suffix: ${task_suffix:-<unknown>}"
+
+          if [ -n "${DISPATCH_RUN_ID:-}" ]; then
+            printf '%s\n' "$DISPATCH_RUN_ID" > dispatch-runs.txt
+          else
+            gh run list --repo "$GITHUB_REPOSITORY" --limit 40 --json databaseId,workflowName \
+              --jq '.[] | select(.workflowName == "Run Demo (Copilot Dispatch)" or .workflowName == "Run Demo (Copilot E2E)" or .workflowName == "Run Demo (Copilot Alpha Candidate)") | .databaseId' \
+              > dispatch-runs.txt
+          fi
+
+          while IFS= read -r run_id; do
+            [ -n "$run_id" ] || continue
+            rm -rf dispatch-search/*
+            echo "Trying dispatch artifact from run ${run_id}"
+            if ! gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name reachable-ci-artifacts --dir dispatch-search 2>/dev/null; then
+              gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name reachable-copilot-alpha-candidate-proof --dir dispatch-search 2>/dev/null || true
+            fi
+            db_path="$(find dispatch-search -name copilot-tasks.repo.db -type f | head -n 1 || true)"
+            dispatch_json="$(find dispatch-search -name copilot-dispatch.json -type f | head -n 1 || true)"
+            if [ -z "$db_path" ] || [ -z "$dispatch_json" ]; then
+              continue
+            fi
+            if [ -n "$task_suffix" ] && ! python3 - "$dispatch_json" "$task_suffix" <<'PY'
+          import json
+          import sys
+          payload = json.loads(open(sys.argv[1], encoding="utf-8").read())
+          suffix = sys.argv[2]
+          tasks = payload.get("tasks") or []
+          if not any(str(task.get("task_id", "")).endswith(suffix) for task in tasks):
+              raise SystemExit(1)
+          PY
+            then
+              continue
+            fi
+            cp "$db_path" dispatch-artifacts/copilot-tasks.repo.db
+            cp "$dispatch_json" dispatch-artifacts/copilot-dispatch.json
+            echo "DISPATCH_RUN_ID=${run_id}" >> "$GITHUB_ENV"
+            echo "Found dispatch task DB in run ${run_id}."
+            exit 0
+          done < dispatch-runs.txt
+
+          echo "No dispatch artifact contained copilot-tasks.repo.db for this Copilot PR." >&2
+          echo "Run a fresh Copilot dispatch with the updated workflow so the task DB is uploaded." >&2
+          exit 1
+
+      - name: Run post-fix Reachable scan
+        run: |
+          set -euo pipefail
+          mkdir -p .reachable/ci-artifacts
+          reachctl scan . --ci \
+            --fail-on none \
+            --branch "${PR_HEAD_REF}" \
+            --commit "$(git rev-parse HEAD)" \
+            --sarif .reachable/ci-artifacts/reachable-after-copilot-pr.sarif
+          after_db="$(python -c 'from reachable.ci.proof_page import find_latest_repo_db; print(find_latest_repo_db())')"
+          cp "$after_db" .reachable/ci-artifacts/copilot-after.repo.db
+          echo "COPILOT_AFTER_REPO_DB=$PWD/.reachable/ci-artifacts/copilot-after.repo.db" >> "$GITHUB_ENV"
+
+      - name: Record DB-backed Copilot verification
+        run: |
+          set -euo pipefail
+          task_id="$(python3 - <<'PY'
+          import json
+          import os
+          import re
+          payload = json.loads(open("dispatch-artifacts/copilot-dispatch.json", encoding="utf-8").read())
+          tasks = payload.get("tasks") or []
+          head = os.environ.get("PR_HEAD_REF", "")
+          match = re.search(r"rch-task-([0-9a-f]+)", head)
+          suffix = match.group(1) if match else ""
+          if suffix:
+              for task in tasks:
+                  task_id = str(task.get("task_id", ""))
+                  if task_id.endswith(suffix):
+                      print(task_id)
+                      raise SystemExit(0)
+          if len(tasks) == 1:
+              print(tasks[0]["task_id"])
+              raise SystemExit(0)
+          raise SystemExit("could not resolve Copilot task ID from dispatch artifact")
+          PY
+          )"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          reachctl copilot verify-pr \
+            --repo-db dispatch-artifacts/copilot-tasks.repo.db \
+            --after-repo-db "${COPILOT_AFTER_REPO_DB}" \
+            --task-id "$task_id" \
+            --pr "${PR_NUMBER}" \
+            --pr-url "${PR_URL}" \
+            --run-url "$run_url" \
+            --json > .reachable/ci-artifacts/copilot-verify-pr.json
+          cat .reachable/ci-artifacts/copilot-verify-pr.json
+          cp dispatch-artifacts/copilot-tasks.repo.db .reachable/ci-artifacts/copilot-verified-tasks.repo.db
+
+      - name: Publish verification proof page
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          python -m reachable.ci.proof_page \
+            --repo-db .reachable/ci-artifacts/copilot-verified-tasks.repo.db \
+            --output-dir .reachable/ci-artifacts/release-proof \
+            --repository "${GITHUB_REPOSITORY}" \
+            --branch "${PR_HEAD_REF}" \
+            --commit "$(git rev-parse HEAD)" \
+            --run-url "$run_url" \
+            --pull-request-url "${PR_URL}" \
+            --workspace "${GITHUB_WORKSPACE}" \
+            --require-copilot-tasks
+
+      - name: Upload Copilot verification artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: reachable-copilot-pr-verification
+          path: .reachable/ci-artifacts/**
+          if-no-files-found: warn
+          retention-days: 14
