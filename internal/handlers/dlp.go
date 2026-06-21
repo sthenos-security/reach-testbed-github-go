@@ -14,9 +14,11 @@ func SupportExport(w http.ResponseWriter, _ *http.Request) {
 		"export_format": "csv",
 	})
 	if err != nil {
-		log.Printf("building analytics payload: %v", err)
+		log.Printf("failed to marshal analytics payload: %v", err)
 	} else {
-		_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
+		if _, err := http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload)); err != nil {
+			log.Printf("failed to send analytics event: %v", err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/csv")
