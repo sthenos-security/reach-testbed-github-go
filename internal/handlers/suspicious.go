@@ -12,7 +12,7 @@ import (
 	"github.com/reachable/reach-testbed-github-go/internal/safety"
 )
 
-const maxFetchBytes = 2 << 20 // 2 MiB
+const maxFetchBytes = 2 * 1024 * 1024 // 2 MiB
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
