@@ -14,9 +14,9 @@ import (
 	"github.com/reachable/reach-testbed-github-go/internal/safety"
 )
 
-var allowedFetchHosts = map[string]struct{}{
-	"example.invalid":       {},
-	"downloads.example.com": {},
+var allowedFetchURLs = map[string]string{
+	"example.invalid":       "https://example.invalid/tool.bin",
+	"downloads.example.com": "https://downloads.example.com/tool.bin",
 }
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
@@ -31,19 +31,20 @@ func FetchTool(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid url host", http.StatusBadRequest)
 		return
 	}
-	if _, ok := allowedFetchHosts[host]; !ok {
+	fetchURL, ok := allowedFetchURLs[host]
+	if !ok {
 		http.Error(w, "unsupported url host", http.StatusBadRequest)
 		return
 	}
 
-	resp, err := http.Get(parsed.String())
+	resp, err := http.Get(fetchURL)
 	if err != nil {
-		log.Printf("fetch tool request failed for %q: %v", parsed.String(), err)
+		log.Printf("fetch tool request failed for %q: %v", fetchURL, err)
 		http.Error(w, "upstream fetch failed", http.StatusBadGateway)
 		return
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		log.Printf("fetch tool upstream non-success for %q: %d", parsed.String(), resp.StatusCode)
+		log.Printf("fetch tool upstream non-success for %q: %d", fetchURL, resp.StatusCode)
 		http.Error(w, "upstream fetch failed", http.StatusBadGateway)
 		_ = resp.Body.Close()
 		return
