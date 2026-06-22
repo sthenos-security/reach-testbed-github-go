@@ -106,7 +106,7 @@ jobs:
             printf '%s\n' "$DISPATCH_RUN_ID" > dispatch-runs.txt
           else
             gh run list --repo "$GITHUB_REPOSITORY" --limit 40 --json databaseId,workflowName \
-              --jq '.[] | select(.workflowName == "Run Demo (Copilot Dispatch)" or .workflowName == "Run Demo (Copilot E2E)" or .workflowName == "Run Demo (Copilot Alpha Candidate)") | .databaseId' \
+              --jq '.[] | select(.workflowName == "Run Demo (Copilot Dispatch)" or .workflowName == "Run Demo (Copilot E2E)" or .workflowName == "Run Demo (Copilot Alpha Candidate)" or .workflowName == "Run Demo (Copilot Bundle Replay)") | .databaseId' \
               > dispatch-runs.txt
           fi
 
@@ -119,6 +119,8 @@ jobs:
             fi
             db_path="$(find dispatch-search -name copilot-tasks.repo.db -type f | head -n 1 || true)"
             dispatch_json="$(find dispatch-search -name copilot-dispatch.json -type f | head -n 1 || true)"
+            bundle_json="$(find dispatch-search -name copilot-bundle.json -type f | head -n 1 || true)"
+            prompt_md="$(find dispatch-search -name copilot-prompt.md -type f | head -n 1 || true)"
             if [ -z "$db_path" ] || [ -z "$dispatch_json" ]; then
               continue
             fi
@@ -136,6 +138,12 @@ jobs:
             fi
             cp "$db_path" dispatch-artifacts/copilot-tasks.repo.db
             cp "$dispatch_json" dispatch-artifacts/copilot-dispatch.json
+            if [ -n "$bundle_json" ]; then
+              cp "$bundle_json" dispatch-artifacts/copilot-bundle.json
+            fi
+            if [ -n "$prompt_md" ]; then
+              cp "$prompt_md" dispatch-artifacts/copilot-prompt.md
+            fi
             echo "DISPATCH_RUN_ID=${run_id}" >> "$GITHUB_ENV"
             echo "Found dispatch task DB in run ${run_id}."
             exit 0
@@ -193,6 +201,12 @@ jobs:
             --json > .reachable/ci-artifacts/copilot-verify-pr.json
           cat .reachable/ci-artifacts/copilot-verify-pr.json
           cp dispatch-artifacts/copilot-tasks.repo.db .reachable/ci-artifacts/copilot-verified-tasks.repo.db
+          if [ -f dispatch-artifacts/copilot-bundle.json ]; then
+            cp dispatch-artifacts/copilot-bundle.json .reachable/ci-artifacts/copilot-bundle.json
+          fi
+          if [ -f dispatch-artifacts/copilot-prompt.md ]; then
+            cp dispatch-artifacts/copilot-prompt.md .reachable/ci-artifacts/copilot-prompt.md
+          fi
 
       - name: Publish verification proof page
         run: |

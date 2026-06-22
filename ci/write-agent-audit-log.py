@@ -37,6 +37,34 @@ def _read_lines(path: Path | None) -> list[str]:
     return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def _expected_scope(bundle: dict[str, Any]) -> dict[str, Any]:
+    rules = bundle.get("selected_rules") if isinstance(bundle.get("selected_rules"), list) else []
+    selected_files: list[str] = []
+    selected_packages: list[str] = []
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        for file_glob in rule.get("file_globs") or []:
+            if isinstance(file_glob, str) and file_glob.strip():
+                selected_files.append(file_glob.strip())
+        for source in rule.get("sources") or []:
+            if isinstance(source, dict):
+                file_path = str(source.get("file_path") or "").strip()
+                if file_path:
+                    selected_files.append(file_path)
+        package = str(rule.get("package") or "").strip()
+        version = str(rule.get("package_version") or "").strip()
+        if package:
+            selected_packages.append(f"{package}@{version}" if version else package)
+    selected_files = sorted(dict.fromkeys(selected_files))
+    selected_packages = sorted(dict.fromkeys(selected_packages or (bundle.get("selected_packages") or [])))
+    return {
+        "selected_rule_count": int(bundle.get("selected_rule_count") or len(rules)),
+        "selected_files": selected_files,
+        "selected_packages": selected_packages,
+    }
+
+
 def _workflow_context() -> dict[str, Any]:
     repository = os.environ.get("GITHUB_REPOSITORY", "")
     run_id = os.environ.get("GITHUB_RUN_ID", "")
@@ -94,6 +122,10 @@ def _write_markdown(path: Path, audit: dict[str, Any]) -> None:
     totals = audit.get("proof", {}).get("totals", {})
     changed_files = audit.get("changed_files") or []
     task = audit.get("copilot_task") or {}
+    expected_scope = audit.get("expected_scope") or {}
+    expected_files = expected_scope.get("selected_files") or []
+    touched_expected_files = expected_scope.get("touched_expected_files") or []
+    missing_expected_files = expected_scope.get("missing_expected_files") or []
     lines = [
         "# Agent Remediation Audit Log",
         "",
@@ -118,6 +150,14 @@ def _write_markdown(path: Path, audit: dict[str, Any]) -> None:
         f"- Verification: `{task.get('verification_status') or 'n/a'}`",
         f"- Selected signals: `{len(task.get('selected_signal_ids') or [])}`",
         "",
+        "## Expected Scope",
+        "",
+        f"- Selected remediation units: `{expected_scope.get('selected_rule_count', 0)}`",
+        f"- Expected files: `{len(expected_files)}`",
+        f"- Touched expected files: `{len(touched_expected_files)}`",
+        f"- Missing expected files: `{len(missing_expected_files)}`",
+        f"- Package targets: `{', '.join(expected_scope.get('selected_packages') or []) or 'n/a'}`",
+        "",
         "## Changed Files",
         "",
     ]
@@ -125,6 +165,16 @@ def _write_markdown(path: Path, audit: dict[str, Any]) -> None:
         lines.extend(f"- `{name}`" for name in changed_files)
     else:
         lines.append("No changed-file list was captured.")
+    if expected_files:
+        lines.extend(
+            [
+                "",
+                "## Expected File Coverage",
+                "",
+            ]
+        )
+        lines.extend(f"- touched `{name}`" for name in touched_expected_files)
+        lines.extend(f"- missing `{name}`" for name in missing_expected_files)
     lines.extend(
         [
             "",
@@ -176,10 +226,16 @@ def _write_outputs(output_dir: Path, audit: dict[str, Any]) -> None:
 def _write_pr_audit(args: argparse.Namespace) -> int:
     summary = _load_json(args.proof_summary)
     verify = _load_json(args.verify_json)
+    bundle = _load_json(args.bundle_json if args.bundle_json is not None else args.artifact_dir / "copilot-bundle.json")
     totals = _proof_totals(summary)
     task = _copilot_task(summary)
     changed_files = _read_lines(args.changed_files)
+    expected_scope = _expected_scope(bundle) if bundle else {"selected_rule_count": 0, "selected_files": [], "selected_packages": []}
+    expected_files = list(expected_scope.get("selected_files") or [])
+    touched_expected_files = [name for name in expected_files if name in changed_files]
+    missing_expected_files = [name for name in expected_files if name not in changed_files]
     result = str(verify.get("result") or "")
+    evaluation = verify.get("evaluation") if isinstance(verify.get("evaluation"), dict) else {}
     task_verified = result == "verified" and task.get("verification_status") == "verified"
     clean = totals.get("release_blockers", 0) == 0
     status = "verified_clean" if task_verified and clean else "insufficient_coverage"
@@ -210,7 +266,16 @@ def _write_pr_audit(args: argparse.Namespace) -> int:
             "absent_signal_ids": (verify.get("evaluation") or {}).get("absent_signal_ids", [])
             if isinstance(verify.get("evaluation"), dict)
             else [],
+            "defended_signal_ids": list(evaluation.get("defended_signal_ids") or []),
+            "still_vulnerable_signal_ids": list(evaluation.get("still_vulnerable_signal_ids") or []),
+            "needs_review_signal_ids": list(evaluation.get("needs_review_signal_ids") or []),
             "json_path": str(args.verify_json) if args.verify_json else "",
+        },
+        "expected_scope": {
+            **expected_scope,
+            "bundle_json_path": str(args.bundle_json) if args.bundle_json else str(args.artifact_dir / "copilot-bundle.json"),
+            "touched_expected_files": touched_expected_files,
+            "missing_expected_files": missing_expected_files,
         },
         "changed_files": changed_files,
         "changed_file_count": len(changed_files),
@@ -253,6 +318,7 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--proof-summary", type=Path, default=None)
     parser.add_argument("--verify-json", type=Path, default=None)
+    parser.add_argument("--bundle-json", type=Path, default=None)
     parser.add_argument("--changed-files", type=Path, default=None)
     parser.add_argument("--go-test-log", type=Path, default=None)
     parser.add_argument("--pr-number", default="")

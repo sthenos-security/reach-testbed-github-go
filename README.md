@@ -40,6 +40,7 @@ workflows so the provider lane is obvious in the Actions UI:
 - [GitHub Actions → Run Demo (Copilot Dispatch)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-copilot.yml)
 - [GitHub Actions → Run Demo (Copilot E2E)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-copilot-e2e.yml)
 - [GitHub Actions → Run Demo (Copilot Alpha Candidate)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-copilot-alpha-candidate.yml)
+- [GitHub Actions → Run Demo (Copilot Bundle Replay)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-copilot-bundle-replay.yml)
 - [GitHub Actions → Dispatch Copilot PR Verification](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-copilot-verification-dispatcher.yml)
 - [GitHub Actions → Agent Parity Check](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-agent-parity.yml)
 
@@ -56,6 +57,7 @@ workflow here with `remediate=false`.
 | `Run Demo (Copilot Dispatch)` | Scan the vulnerable release candidate and dispatch bounded GitHub Copilot cloud-agent issues/tasks from DB-backed evidence. Copilot PRs require later REACHABLE verification before they are considered ready. | Yes |
 | `Run Demo (Copilot E2E)` | Run the proof-gated Copilot demo from this Go repo and fail unless the published artifact contains at least one dispatched Copilot task with a GitHub issue/task identifier. | Yes |
 | `Run Demo (Copilot Alpha Candidate)` | Install a non-published reach-core Test Release candidate dist directly and prove Copilot dispatch from this Go repo before any Marketplace rollout. | Yes |
+| `Run Demo (Copilot Bundle Replay)` | Re-dispatch Copilot from a saved bundle and pre-dispatch DB artifact so prompt/task changes can be tested without another full Reachable scan. | Yes |
 | `Dispatch Copilot PR Verification` | Trusted scheduled/manual workflow that finds open Copilot PRs and dispatches `Verify Copilot PR` from `main`, avoiding PR-event approval gates for bot-authored PRs. | Yes |
 | `Agent Parity Check` | Compare Codex, Claude, and Copilot proof artifacts by verified security outcome instead of diff text. | Yes |
 | `Reset Demo` | Delete old `reachable-remediate-*` demo branches before a fresh run. | Optional |

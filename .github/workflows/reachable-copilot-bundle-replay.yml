@@ -1,0 +1,129 @@
+name: "Run Demo (Copilot Bundle Replay)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      dispatch_run_id:
+        description: Prior Copilot dispatch or alpha-proof run ID with bundle and pre-dispatch DB artifacts
+        type: string
+        required: true
+      target_branch:
+        description: Base branch to use when opening the Copilot remediation PR
+        type: string
+        default: "main"
+      reachable_dist_base_url:
+        description: Optional Reachable dist base URL override for candidate installs
+        type: string
+        default: ""
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: write
+  security-events: write
+
+jobs:
+  replay-copilot-bundle:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.target_branch }}
+          fetch-depth: 1
+
+      - name: Download replay source artifacts
+        run: |
+          set -euo pipefail
+          rm -rf replay-source .reachable/ci-artifacts
+          mkdir -p replay-source .reachable/ci-artifacts
+          if ! gh run download "${{ inputs.dispatch_run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name reachable-ci-artifacts \
+            --dir replay-source 2>/dev/null; then
+            gh run download "${{ inputs.dispatch_run_id }}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --name reachable-copilot-alpha-candidate-proof \
+              --dir replay-source
+          fi
+          pre_dispatch_db="$(find replay-source -name copilot-pre-dispatch.repo.db -type f | head -n 1 || true)"
+          bundle_json="$(find replay-source -name copilot-bundle.json -type f | head -n 1 || true)"
+          prompt_md="$(find replay-source -name copilot-prompt.md -type f | head -n 1 || true)"
+          if [ -z "$pre_dispatch_db" ]; then
+            echo "Missing copilot-pre-dispatch.repo.db in run ${{ inputs.dispatch_run_id }}." >&2
+            echo "Run a fresh Copilot dispatch with the updated artifact contract before replaying." >&2
+            exit 1
+          fi
+          if [ -z "$bundle_json" ]; then
+            echo "Missing copilot-bundle.json in run ${{ inputs.dispatch_run_id }}." >&2
+            echo "Run a fresh Copilot dispatch with the updated artifact contract before replaying." >&2
+            exit 1
+          fi
+          cp "$pre_dispatch_db" .reachable/ci-artifacts/copilot-pre-dispatch.repo.db
+          cp "$bundle_json" .reachable/ci-artifacts/copilot-bundle.json
+          if [ -n "$prompt_md" ]; then
+            cp "$prompt_md" .reachable/ci-artifacts/copilot-prompt.md
+          fi
+
+      - name: Setup Reachable
+        uses: sthenos-security/reach-ci-github/actions/setup-reachable@v1
+        with:
+          dist-repo: sthenos-security/reach-dist
+          dist-base-url: ${{ inputs.reachable_dist_base_url }}
+          fresh-scan: true
+
+      - name: Replay Copilot remediation bundle
+        run: |
+          set -euo pipefail
+          cp .reachable/ci-artifacts/copilot-pre-dispatch.repo.db .reachable/ci-artifacts/copilot-replay-work.repo.db
+          reachctl copilot doctor \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dispatch-kind agent_task \
+            --json > .reachable/ci-artifacts/copilot-doctor.json
+          reachctl copilot dispatch \
+            --repo-db .reachable/ci-artifacts/copilot-replay-work.repo.db \
+            --bundle .reachable/ci-artifacts/copilot-bundle.json \
+            --repo "${GITHUB_REPOSITORY}" \
+            --mode reachable-high \
+            --base-ref "${{ inputs.target_branch }}" \
+            --dispatch-kind agent_task \
+            --json > .reachable/ci-artifacts/copilot-dispatch.json
+          cp .reachable/ci-artifacts/copilot-replay-work.repo.db .reachable/ci-artifacts/copilot-tasks.repo.db
+          task_count="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path(".reachable/ci-artifacts/copilot-dispatch.json").read_text(encoding="utf-8"))
+          print(len(payload.get("tasks") or []))
+          PY
+          )"
+          if [ "$task_count" -lt 1 ]; then
+            echo "Replay dispatch did not produce any Copilot tasks." >&2
+            exit 1
+          fi
+          echo "Replayed ${task_count} Copilot task(s) from fixed bundle input."
+
+      - name: Publish replay proof page
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          python -m reachable.ci.proof_page \
+            --repo-db .reachable/ci-artifacts/copilot-tasks.repo.db \
+            --output-dir .reachable/ci-artifacts/release-proof \
+            --repository "${GITHUB_REPOSITORY}" \
+            --branch "${{ inputs.target_branch }}" \
+            --commit "$(git rev-parse HEAD)" \
+            --run-url "$run_url" \
+            --workspace "${GITHUB_WORKSPACE}" \
+            --require-copilot-tasks
+
+      - name: Upload replay artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: reachable-ci-artifacts
+          if-no-files-found: error
+          path: .reachable/ci-artifacts/**

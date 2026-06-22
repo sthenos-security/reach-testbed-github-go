@@ -47,6 +47,7 @@ All of the following must be true before the parity goal is considered complete:
 | `reach-testbed-github-go` | Codex proof lane | Codex / complete | Successful remediation run with DB-backed clean proof | `reachable-ci-artifacts` with `release-proof/summary.json` showing zero release blockers | Fresh parity replay run `27912011654` succeeded; artifact `7777713855`; PR `#17`; `release_blockers=0`, `reachable=0` | Keep artifact for parity comparison |
 | `reach-testbed-github-go` | Claude proof lane | Claude / complete | Successful remediation run with DB-backed clean proof | `reachable-ci-artifacts` with `release-proof/summary.json` showing zero release blockers | Fresh parity replay run `27912011701` succeeded; artifact `7777726968`; PR `#18`; `release_blockers=0`, `reachable=0` | Keep artifact for parity comparison |
 | `reach-ci-github` | Copilot dispatch lane | Codex / complete | Copilot lane uses `agent_task`, not `issue_assignment` | Dispatch artifact includes `copilot-tasks.repo.db`, `copilot-dispatch.json`, and `github_task_id` | Fresh Go dispatch proof run `27912011678` created task `rch_task_467353d6ed2309d6` with `github_task_id=791c6b88-8b88-45e2-9272-5b74bba49571` | Use PR `#16` for DB-backed verification |
+| `reach-ci-github` | Copilot fixed-input replay artifact | Codex / in progress | Copilot dispatch artifacts preserve the exact selected bundle plus a pre-dispatch repo DB for cheap replay | `copilot-bundle.json`, `copilot-prompt.md`, and `copilot-pre-dispatch.repo.db` inside `reachable-ci-artifacts` | Artifact contract patched locally; pending first live replay run from a fresh dispatch built with the updated workflow | Re-run `Run Demo (Copilot Dispatch)` once, then use `Run Demo (Copilot Bundle Replay)` for fast task-shaping iterations |
 | `reach-testbed-github-go` | Copilot PR proof lane | Codex / insufficient | Copilot PR can be re-scanned, build-tested, audit-logged, and terminally verified from DB evidence | `reachable-copilot-pr-verification` artifact plus `copilot-go-test.log`, `agent-remediation-audit-log.json`, `release-proof/summary.json`, and `copilot_tasks` terminal row | Verification run `27912272154` proved task `rch_task_467353d6ed2309d6` on PR `#16`, but stricter local replay reports `blocking_results=17`; the PR only changed `internal/handlers/dlp.go` and did not prove full remediation coverage | Re-run after the verifier includes build/test evidence, audit-log evidence, and post-fix clean proof |
 | `reach-testbed-github-go` | Copilot high-quality remediation coverage | Codex / open | Copilot clears the same actionable release-blocker scope as Codex and Claude, including dependency/module-version remediation where required | Copilot post-fix `release-proof/summary.json` with zero release blockers, plus `agent-remediation-audit-log.json` showing selected signals and changed files | Current Copilot PR `#16` is narrow DLP-only; Codex PR `#17` and Claude PR `#18` addressed broader handler files and `go.mod`/`go.sum` | Broaden Copilot dispatch/campaign until coverage matches Codex and Claude outcomes |
 | `reach-testbed-github-go` | Cross-agent parity comparison | Codex / insufficient | Comparator passes for Codex, Claude, and Copilot artifacts from the same parity campaign, with all three post-fix proofs clean | `agent-parity-report.json` and aggregate `agent-remediation-audit-log.json` with `ok=true`, zero Copilot `blocking_results`, and no mismatches | Run `27912378610` passed under the old narrow rule; local replay with the strict comparator fails because Copilot is `task_verified=true` but `clean=false`, `blocking_results=17` | Re-run parity after the stricter comparator is in place |
@@ -70,12 +71,14 @@ The parity campaign should use the following sequence:
 1. Run `Run Demo (Codex)` against `main`.
 2. Run `Run Demo (Claude)` against `main`.
 3. Run `Run Demo (Copilot Dispatch)` against `main`.
-4. Wait for the corresponding `Copilot cloud agent` PR.
-5. Run `Verify Copilot PR` against that PR and dispatch run.
-6. If Copilot only fixes a subset of the release blockers, dispatch additional
+4. If the first Copilot result is weak, run `Run Demo (Copilot Bundle Replay)`
+   against the saved dispatch artifact instead of rescanning the repo.
+5. Wait for the corresponding `Copilot cloud agent` PR.
+6. Run `Verify Copilot PR` against that PR and dispatch run.
+7. If Copilot only fixes a subset of the release blockers, dispatch additional
    Copilot tasks or a broader Copilot campaign until the post-fix proof is
    clean.
-7. Run `Agent Parity Check` with the final clean run IDs.
+8. Run `Agent Parity Check` with the final clean run IDs.
 
 ## Artifact Contract
 
@@ -88,6 +91,9 @@ The parity workflow compares proof artifacts, not commits:
   - `reachable-ci-artifacts`
   - `copilot-dispatch.json`
   - `copilot-tasks.repo.db`
+  - `copilot-pre-dispatch.repo.db`
+  - `copilot-bundle.json`
+  - `copilot-prompt.md`
 - Copilot verification:
   - `reachable-copilot-pr-verification`
   - `copilot-go-test.log`

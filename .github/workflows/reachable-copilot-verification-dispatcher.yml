@@ -189,10 +189,9 @@ jobs:
               done < <(
                 gh run list \
                   --repo "$GITHUB_REPOSITORY" \
-                  --workflow "Run Demo (Copilot Dispatch)" \
-                  --limit 40 \
-                  --json databaseId \
-                  --jq '.[].databaseId'
+                  --limit 80 \
+                  --json databaseId,workflowName \
+                  --jq '.[] | select(.workflowName == "Run Demo (Copilot Dispatch)" or .workflowName == "Run Demo (Copilot Bundle Replay)" or .workflowName == "Run Demo (Copilot Alpha Candidate)") | .databaseId'
               )
             fi
 
