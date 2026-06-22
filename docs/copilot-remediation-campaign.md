@@ -99,6 +99,11 @@ Auto-merge is not a v1 default. It is a roadmap feature for customers who ask
 for it and are willing to grant a trusted REACHABLE workflow or GitHub App the
 required repository permissions.
 
+The current workflow has a hard kill switch: `Agent Parity Check` exposes an
+`auto_merge` input that defaults to `false`, and the workflow fails immediately
+if it is set to `true`. The v1 workflow verifies and publishes proof only; it
+must not run `git merge`, `git push`, or `gh pr merge`.
+
 The intended opt-in design is:
 
 1. Require an explicit policy switch such as a `reachable-automerge` label.

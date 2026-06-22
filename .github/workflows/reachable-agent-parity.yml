@@ -33,6 +33,10 @@ on:
         description: Optional expected Copilot PR number
         type: string
         default: ""
+      auto_merge:
+        description: "Kill switch: must remain false. Auto-merge is not implemented in the v1 campaign workflow."
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -46,6 +50,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Enforce auto-merge kill switch
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.auto_merge }}" != "false" ]; then
+            echo "::error::Auto-merge is disabled for the v1 Copilot campaign workflow. Verify and publish proof only; do not run git merge or gh pr merge from this workflow."
+            exit 1
+          fi
+          echo "Auto-merge kill switch is active; this workflow will not merge Copilot PRs."
 
       - name: Download Codex artifacts
         run: |
