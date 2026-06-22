@@ -127,6 +127,7 @@ jobs:
             --bundle .reachable/remediation-bundle/bundle.json \
             --repo "${GITHUB_REPOSITORY}" \
             --mode reachable-high \
+            --max-tasks 5 \
             --base-ref "${{ inputs.target_branch }}" \
             --dispatch-kind agent_task \
             --json > .reachable/ci-artifacts/copilot-dispatch.json
