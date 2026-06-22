@@ -64,6 +64,26 @@ All of the following must be true before the parity goal is considered complete:
 | Copilot verification | `Verify Copilot PR` | `27912272154` | Insufficient | `reachable-copilot-pr-verification` with task row `verification_status=verified`, build/test log, audit log, and clean post-fix proof | Artifact `7777723020`; task `rch_task_467353d6ed2309d6`, PR `#16`, result `verified`; coverage was DLP-only |
 | Parity comparison | `Agent Parity Check` | `27912378610` | Insufficient | `reachable-agent-parity-report/agent-parity-report.json` and aggregate audit log with `ok=true` under the strict clean-Copilot rule | Artifact `7777743207` passed the old rule; that proof is retired as a final parity claim |
 
+## Current Copilot Shard Contract
+
+The current Copilot campaign should not dispatch one 13-rule mixed batch. The
+current live dry run against alpha-proof artifact `27960935439` and the updated
+`reach-core` sharder produces five tasks:
+
+1. `internal/handlers/cwe.go` — 3 rules (`EXPLOITABLE_NOW` plus same-file
+   follow-on flow rules)
+2. `internal/handlers/ai.go`, `internal/handlers/cve.go`,
+   `internal/handlers/suspicious.go` — 4 rules (fetch/error-disclosure shard)
+3. `internal/handlers/cve.go` + package target `golang.org/x/text` — 1 rule
+   (`DEPENDENCY_SWEEP`)
+4. `internal/handlers/ai.go`, `internal/handlers/dlp.go` — 4 rules
+   (`REACHABLE_CRITICAL` outbound sensitive-data shard)
+5. `internal/handlers/secrets.go` — 1 rule (`BACKLOG` secret cleanup)
+
+This is the active task shape to prove next. The fresh `reach-core` candidate
+build for that proof was triggered as run `27973261407` on branch
+`agent-plugin-alpha-proof`.
+
 ## Required Run Set
 
 The parity campaign should use the following sequence:
