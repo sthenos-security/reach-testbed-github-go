@@ -65,6 +65,30 @@ def _expected_scope(bundle: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _workspace_root() -> Path | None:
+    raw = os.environ.get("GITHUB_WORKSPACE", "").strip()
+    if not raw:
+        return None
+    root = Path(raw).resolve()
+    return root if root.exists() else None
+
+
+def _normalize_scope_path(path: str) -> str:
+    value = str(path or "").strip()
+    if not value:
+        return ""
+    if "*" in value or "?" in value or "[" in value:
+        return value
+    candidate = Path(value)
+    workspace = _workspace_root()
+    if candidate.is_absolute() and workspace is not None:
+        try:
+            return candidate.resolve().relative_to(workspace).as_posix()
+        except Exception:
+            return candidate.as_posix()
+    return value.replace("\\", "/")
+
+
 def _workflow_context() -> dict[str, Any]:
     repository = os.environ.get("GITHUB_REPOSITORY", "")
     run_id = os.environ.get("GITHUB_RUN_ID", "")
@@ -231,7 +255,12 @@ def _write_pr_audit(args: argparse.Namespace) -> int:
     task = _copilot_task(summary)
     changed_files = _read_lines(args.changed_files)
     expected_scope = _expected_scope(bundle) if bundle else {"selected_rule_count": 0, "selected_files": [], "selected_packages": []}
-    expected_files = list(expected_scope.get("selected_files") or [])
+    expected_files = [
+        normalized
+        for normalized in (_normalize_scope_path(name) for name in expected_scope.get("selected_files") or [])
+        if normalized
+    ]
+    expected_scope["selected_files"] = expected_files
     touched_expected_files = [name for name in expected_files if name in changed_files]
     missing_expected_files = [name for name in expected_files if name not in changed_files]
     result = str(verify.get("result") or "")

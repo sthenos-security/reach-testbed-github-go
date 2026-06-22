@@ -105,7 +105,7 @@ jobs:
           if [ -n "${DISPATCH_RUN_ID:-}" ]; then
             printf '%s\n' "$DISPATCH_RUN_ID" > dispatch-runs.txt
           else
-            gh run list --repo "$GITHUB_REPOSITORY" --limit 40 --json databaseId,workflowName \
+            gh run list --repo "$GITHUB_REPOSITORY" --limit 200 --json databaseId,workflowName \
               --jq '.[] | select(.workflowName == "Run Demo (Copilot Dispatch)" or .workflowName == "Run Demo (Copilot E2E)" or .workflowName == "Run Demo (Copilot Alpha Candidate)" or .workflowName == "Run Demo (Copilot Bundle Replay)") | .databaseId' \
               > dispatch-runs.txt
           fi
@@ -212,8 +212,43 @@ jobs:
         run: |
           set -euo pipefail
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          cp "${COPILOT_AFTER_REPO_DB}" .reachable/ci-artifacts/copilot-proof.repo.db
+          python3 - <<'PY'
+          import sqlite3
+          from pathlib import Path
+
+          proof_db = Path(".reachable/ci-artifacts/copilot-proof.repo.db")
+          task_db = Path(".reachable/ci-artifacts/copilot-verified-tasks.repo.db")
+
+          proof = sqlite3.connect(proof_db)
+          proof.row_factory = sqlite3.Row
+          proof.execute("ATTACH DATABASE ? AS taskdb", (str(task_db),))
+          try:
+              table = proof.execute(
+                  "SELECT name FROM taskdb.sqlite_master WHERE type='table' AND name='copilot_tasks'"
+              ).fetchone()
+              if table is None:
+                  raise SystemExit("copilot_tasks table is missing from the verified Copilot task DB")
+              proof.execute("DROP TABLE IF EXISTS copilot_tasks")
+              create_sql = proof.execute(
+                  "SELECT sql FROM taskdb.sqlite_master WHERE type='table' AND name='copilot_tasks'"
+              ).fetchone()[0]
+              proof.execute(create_sql)
+              proof.execute("INSERT INTO copilot_tasks SELECT * FROM taskdb.copilot_tasks")
+              events = proof.execute(
+                  "SELECT sql FROM taskdb.sqlite_master WHERE type='table' AND name='copilot_task_events'"
+              ).fetchone()
+              if events and events[0]:
+                  proof.execute("DROP TABLE IF EXISTS copilot_task_events")
+                  proof.execute(events[0])
+                  proof.execute("INSERT INTO copilot_task_events SELECT * FROM taskdb.copilot_task_events")
+              proof.commit()
+          finally:
+              proof.execute("DETACH DATABASE taskdb")
+              proof.close()
+          PY
           python -m reachable.ci.proof_page \
-            --repo-db .reachable/ci-artifacts/copilot-verified-tasks.repo.db \
+            --repo-db .reachable/ci-artifacts/copilot-proof.repo.db \
             --output-dir .reachable/ci-artifacts/release-proof \
             --repository "${GITHUB_REPOSITORY}" \
             --branch "${PR_HEAD_REF}" \
