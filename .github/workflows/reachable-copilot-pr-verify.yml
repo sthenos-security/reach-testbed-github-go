@@ -286,11 +286,33 @@ jobs:
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           cp "${COPILOT_AFTER_REPO_DB}" .reachable/ci-artifacts/copilot-proof.repo.db
           python3 - <<'PY'
+          import json
           import sqlite3
           from pathlib import Path
 
           proof_db = Path(".reachable/ci-artifacts/copilot-proof.repo.db")
-          task_db = Path(".reachable/ci-artifacts/copilot-verified-tasks.repo.db")
+          task_db = Path(".reachable/ci-artifacts/copilot-dispatch-tasks.repo.db")
+          if not task_db.exists():
+              task_db = Path(".reachable/ci-artifacts/copilot-verified-tasks.repo.db")
+          verify_json = Path(".reachable/ci-artifacts/copilot-verify-pr.json")
+
+          raw = verify_json.read_text(encoding="utf-8")
+          decoder = json.JSONDecoder()
+          payload = None
+          for index, char in enumerate(raw):
+              if char != "{":
+                  continue
+              try:
+                  payload, _ = decoder.raw_decode(raw[index:])
+                  break
+              except json.JSONDecodeError:
+                  continue
+          if not isinstance(payload, dict):
+              raise SystemExit("copilot-verify-pr.json did not contain a JSON object")
+          task_id = str(payload.get("task_id") or "")
+          result = str(payload.get("result") or "")
+          if not task_id or not result:
+              raise SystemExit("copilot-verify-pr.json missing task_id/result")
 
           proof = sqlite3.connect(proof_db)
           proof.row_factory = sqlite3.Row
@@ -302,21 +324,42 @@ jobs:
               if table is None:
                   raise SystemExit("copilot_tasks table is missing from the verified Copilot task DB")
               proof.execute("DROP TABLE IF EXISTS copilot_tasks")
-              create_sql = proof.execute(
-                  "SELECT sql FROM taskdb.sqlite_master WHERE type='table' AND name='copilot_tasks'"
-              ).fetchone()
-              if create_sql is None or not create_sql[0]:
-                  raise SystemExit("copilot_tasks DDL is missing from the verified Copilot task DB")
-              create_sql = create_sql[0]
-              proof.execute(create_sql)
-              proof.execute("INSERT INTO copilot_tasks SELECT * FROM taskdb.copilot_tasks")
+              proof.execute("CREATE TABLE copilot_tasks AS SELECT * FROM taskdb.copilot_tasks")
+              update_cursor = proof.execute(
+                  """
+                  UPDATE copilot_tasks
+                  SET state = ?,
+                      verification_status = ?,
+                      verification_run_url = ?,
+                      pr_number = ?,
+                      pr_url = ?,
+                      updated_at = CURRENT_TIMESTAMP
+                  WHERE task_id = ?
+                  """,
+                  (
+                      result,
+                      result,
+                      str(payload.get("run_url") or ""),
+                      payload.get("pr_number"),
+                      str(payload.get("pr_url") or ""),
+                      task_id,
+                  ),
+              )
+              if update_cursor.rowcount == 0:
+                  raise SystemExit(f"copilot_tasks has no row for {task_id}")
               events = proof.execute(
-                  "SELECT sql FROM taskdb.sqlite_master WHERE type='table' AND name='copilot_task_events'"
+                  "SELECT name FROM taskdb.sqlite_master WHERE type='table' AND name='copilot_task_events'"
               ).fetchone()
-              if events and events[0]:
+              if events:
                   proof.execute("DROP TABLE IF EXISTS copilot_task_events")
-                  proof.execute(events[0])
-                  proof.execute("INSERT INTO copilot_task_events SELECT * FROM taskdb.copilot_task_events")
+                  proof.execute("CREATE TABLE copilot_task_events AS SELECT * FROM taskdb.copilot_task_events")
+                  proof.execute(
+                      """
+                      INSERT INTO copilot_task_events (task_id, source, delivery_id, event_type, event_json)
+                      VALUES (?, 'reachable-workflow', NULL, 'verification_artifact_normalized', ?)
+                      """,
+                      (task_id, json.dumps(payload, sort_keys=True)),
+                  )
               proof.commit()
           finally:
               proof.execute("DETACH DATABASE taskdb")
