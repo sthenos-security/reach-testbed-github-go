@@ -291,10 +291,28 @@ jobs:
           from pathlib import Path
 
           proof_db = Path(".reachable/ci-artifacts/copilot-proof.repo.db")
-          task_db = Path(".reachable/ci-artifacts/copilot-dispatch-tasks.repo.db")
-          if not task_db.exists():
-              task_db = Path(".reachable/ci-artifacts/copilot-verified-tasks.repo.db")
+          verified_task_db = Path(".reachable/ci-artifacts/copilot-verified-tasks.repo.db")
+          dispatch_task_db = Path(".reachable/ci-artifacts/copilot-dispatch-tasks.repo.db")
           verify_json = Path(".reachable/ci-artifacts/copilot-verify-pr.json")
+
+          def has_copilot_tasks(path: Path) -> bool:
+              if not path.exists():
+                  return False
+              with sqlite3.connect(path) as conn:
+                  row = conn.execute(
+                      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='copilot_tasks'"
+                  ).fetchone()
+                  return row is not None
+
+          if has_copilot_tasks(verified_task_db):
+              task_db = verified_task_db
+          elif has_copilot_tasks(dispatch_task_db):
+              task_db = dispatch_task_db
+          else:
+              raise SystemExit(
+                  "neither copilot-verified-tasks.repo.db nor copilot-dispatch-tasks.repo.db "
+                  "contains copilot_tasks"
+              )
 
           raw = verify_json.read_text(encoding="utf-8")
           decoder = json.JSONDecoder()
@@ -318,12 +336,7 @@ jobs:
           proof.row_factory = sqlite3.Row
           proof.execute("ATTACH DATABASE ? AS taskdb", (str(task_db),))
           try:
-              table = proof.execute(
-                  "SELECT name FROM taskdb.sqlite_master WHERE type='table' AND name='copilot_tasks'"
-              ).fetchone()
-              if table is None:
-                  raise SystemExit("copilot_tasks table is missing from the verified Copilot task DB")
-              proof.execute("DROP TABLE IF EXISTS copilot_tasks")
+              proof.execute("DROP TABLE IF EXISTS main.copilot_tasks")
               proof.execute("CREATE TABLE copilot_tasks AS SELECT * FROM taskdb.copilot_tasks")
               update_cursor = proof.execute(
                   """
@@ -351,7 +364,7 @@ jobs:
                   "SELECT name FROM taskdb.sqlite_master WHERE type='table' AND name='copilot_task_events'"
               ).fetchone()
               if events:
-                  proof.execute("DROP TABLE IF EXISTS copilot_task_events")
+                  proof.execute("DROP TABLE IF EXISTS main.copilot_task_events")
                   proof.execute("CREATE TABLE copilot_task_events AS SELECT * FROM taskdb.copilot_task_events")
                   proof.execute(
                       """
