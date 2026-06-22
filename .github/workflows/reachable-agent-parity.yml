@@ -12,9 +12,15 @@ on:
         type: string
         required: true
       copilot_verify_run_id:
-        description: Successful `Verify Copilot PR` run ID
+        description: Successful `Verify Copilot PR` run ID for a single-PR Copilot proof
         type: string
-        required: true
+        required: false
+        default: ""
+      copilot_verify_run_ids:
+        description: Optional comma/newline/space separated `Verify Copilot PR` run IDs for a multi-PR Copilot campaign
+        type: string
+        required: false
+        default: ""
       expected_repository:
         description: Expected repository owner/name
         type: string
@@ -63,10 +69,43 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p parity/copilot
-          gh run download "${{ inputs.copilot_verify_run_id }}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --name reachable-copilot-pr-verification \
-            --dir parity/copilot
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          raw = (os.environ.get("COPILOT_VERIFY_RUN_IDS") or "").strip()
+          fallback = (os.environ.get("COPILOT_VERIFY_RUN_ID") or "").strip()
+          if not raw:
+              raw = fallback
+          run_ids = [token for token in re.split(r"[\s,]+", raw) if token]
+          if not run_ids:
+              raise SystemExit("At least one Copilot verify run ID is required.")
+          for run_id in run_ids:
+              target = Path("parity/copilot") / f"run-{run_id}"
+              target.mkdir(parents=True, exist_ok=True)
+              subprocess.run(
+                  [
+                      "gh",
+                      "run",
+                      "download",
+                      run_id,
+                      "--repo",
+                      os.environ["GITHUB_REPOSITORY"],
+                      "--name",
+                      "reachable-copilot-pr-verification",
+                      "--dir",
+                      str(target),
+                  ],
+                  check=True,
+              )
+          print(f"Downloaded {len(run_ids)} Copilot verification artifact(s).")
+          PY
+        env:
+          COPILOT_VERIFY_RUN_ID: ${{ inputs.copilot_verify_run_id }}
+          COPILOT_VERIFY_RUN_IDS: ${{ inputs.copilot_verify_run_ids }}
 
       - name: Compare parity outcomes
         run: |

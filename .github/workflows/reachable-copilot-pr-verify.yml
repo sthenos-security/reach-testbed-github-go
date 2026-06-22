@@ -201,6 +201,9 @@ jobs:
             --json > .reachable/ci-artifacts/copilot-verify-pr.json
           cat .reachable/ci-artifacts/copilot-verify-pr.json
           cp dispatch-artifacts/copilot-tasks.repo.db .reachable/ci-artifacts/copilot-verified-tasks.repo.db
+          if [ -f dispatch-artifacts/copilot-dispatch.json ]; then
+            cp dispatch-artifacts/copilot-dispatch.json .reachable/ci-artifacts/copilot-dispatch.json
+          fi
           if [ -f dispatch-artifacts/copilot-bundle.json ]; then
             cp dispatch-artifacts/copilot-bundle.json .reachable/ci-artifacts/copilot-bundle.json
           fi
