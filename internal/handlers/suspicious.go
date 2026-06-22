@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -11,6 +12,29 @@ import (
 	"path/filepath"
 	"strings"
 )
+
+// privateNets lists CIDR ranges that must not be reached by user-controlled URLs.
+var privateNets []*net.IPNet
+
+func init() {
+	for _, cidr := range []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",
+		"169.254.0.0/16",
+		"0.0.0.0/8",
+		"100.64.0.0/10",
+		"::1/128",
+		"fc00::/7",
+		"fe80::/10",
+	} {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err == nil {
+			privateNets = append(privateNets, ipNet)
+		}
+	}
+}
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
@@ -21,8 +45,7 @@ func FetchTool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	host := strings.ToLower(parsed.Hostname())
-	if isPrivateHost(host) {
+	if isPrivateHost(parsed.Hostname()) {
 		http.Error(w, "invalid url: host not allowed", http.StatusBadRequest)
 		return
 	}
@@ -53,17 +76,43 @@ func FetchTool(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(target + "\n"))
 }
 
-// isPrivateHost returns true for loopback, link-local, and internal hostnames.
+// isPrivateHost returns true for loopback, link-local, cloud-metadata, and private
+// network hostnames or IP addresses.
 func isPrivateHost(host string) bool {
-	private := []string{
-		"localhost", "127.", "::1", "0.", "10.", "172.16.", "172.17.", "172.18.",
-		"172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
-		"172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.", "192.168.",
-		"169.254.", "metadata.", "[::1]", "fc", "fd",
-	}
-	for _, p := range private {
-		if strings.HasPrefix(host, p) {
+	// Block well-known metadata endpoints.
+	lower := strings.ToLower(host)
+	for _, blocked := range []string{"localhost", "metadata.google.internal", "metadata.azure.com"} {
+		if lower == blocked {
 			return true
+		}
+	}
+
+	// If the host parses as an IP address, check against private CIDR ranges.
+	ip := net.ParseIP(host)
+	if ip != nil {
+		for _, network := range privateNets {
+			if network.Contains(ip) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Resolve the hostname and check each resolved IP.
+	addrs, err := net.LookupHost(host)
+	if err != nil {
+		// Cannot resolve; block the request.
+		return true
+	}
+	for _, addr := range addrs {
+		ip := net.ParseIP(addr)
+		if ip == nil {
+			return true
+		}
+		for _, network := range privateNets {
+			if network.Contains(ip) {
+				return true
+			}
 		}
 	}
 	return false

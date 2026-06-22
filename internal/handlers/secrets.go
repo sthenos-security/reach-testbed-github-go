@@ -15,10 +15,14 @@ func ServiceToken(w http.ResponseWriter, _ *http.Request) {
 
 func CloudTokens(w http.ResponseWriter, _ *http.Request) {
 	// Synthetic fixture values only. These are not real credentials.
-	githubToken := os.Getenv("GITHUB_TOKEN")
+	githubConfigured := os.Getenv("GITHUB_TOKEN") != ""
+	githubStatus := ""
+	if githubConfigured {
+		githubStatus = "configured"
+	}
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"aws_access_key_id": syntheticAWSAccessKeyID,
-		"github_token":      githubToken,
+		"github_token":      githubStatus,
 	})
 }
 
