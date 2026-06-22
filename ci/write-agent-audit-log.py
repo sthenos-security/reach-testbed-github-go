@@ -228,6 +228,22 @@ def _write_parity_markdown(path: Path, audit: dict[str, Any]) -> None:
             f"| `{lane_name}` | `{str(lane.get('clean', False)).lower()}` | "
             f"`{lane.get('blocking_results', '')}` | `{lane.get('branch', '')}` |"
         )
+    copilot = lanes.get("copilot") if isinstance(lanes.get("copilot"), dict) else {}
+    if copilot:
+        verified_task_ids = copilot.get("verified_task_ids") or []
+        task_ids = copilot.get("task_ids") or []
+        unresolved_signal_ids = copilot.get("unresolved_signal_ids") or []
+        if verified_task_ids or task_ids or unresolved_signal_ids:
+            lines.extend(
+                [
+                    "",
+                    "## Copilot Campaign",
+                    "",
+                    f"- Verified tasks: `{len(verified_task_ids)}/{len(task_ids)}`",
+                    f"- Task IDs: `{', '.join(task_ids) if task_ids else ''}`",
+                    f"- Unresolved selected signals: `{', '.join(unresolved_signal_ids) if unresolved_signal_ids else 'none'}`",
+                ]
+            )
     mismatches = audit.get("mismatches") or []
     lines.extend(["", "## Mismatches", ""])
     if mismatches:

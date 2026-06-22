@@ -134,6 +134,7 @@ The parity workflow compares proof artifacts, not commits:
 - Copilot verification:
   - `reachable-copilot-pr-verification`
   - `copilot-go-test.log`
+  - `copilot-dispatch.json`
   - `agent-remediation-audit-log.json`
   - `agent-remediation-audit-log.md`
   - `copilot-verify-pr.json`
