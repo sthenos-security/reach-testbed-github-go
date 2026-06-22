@@ -191,8 +191,10 @@ jobs:
           PY
           )"
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          cp dispatch-artifacts/copilot-tasks.repo.db .reachable/ci-artifacts/copilot-dispatch-tasks.repo.db
+          cp dispatch-artifacts/copilot-tasks.repo.db .reachable/ci-artifacts/copilot-verified-tasks.repo.db
           reachctl copilot verify-pr \
-            --repo-db dispatch-artifacts/copilot-tasks.repo.db \
+            --repo-db .reachable/ci-artifacts/copilot-verified-tasks.repo.db \
             --after-repo-db "${COPILOT_AFTER_REPO_DB}" \
             --task-id "$task_id" \
             --pr "${PR_NUMBER}" \
@@ -200,7 +202,74 @@ jobs:
             --run-url "$run_url" \
             --json > .reachable/ci-artifacts/copilot-verify-pr.json
           cat .reachable/ci-artifacts/copilot-verify-pr.json
-          cp dispatch-artifacts/copilot-tasks.repo.db .reachable/ci-artifacts/copilot-verified-tasks.repo.db
+          python3 - <<'PY'
+          import json
+          import sqlite3
+          from pathlib import Path
+
+          verified_db = Path(".reachable/ci-artifacts/copilot-verified-tasks.repo.db")
+          source_db = Path(".reachable/ci-artifacts/copilot-dispatch-tasks.repo.db")
+          verify_json = Path(".reachable/ci-artifacts/copilot-verify-pr.json")
+
+          raw = verify_json.read_text(encoding="utf-8")
+          decoder = json.JSONDecoder()
+          payload = None
+          for index, char in enumerate(raw):
+              if char != "{":
+                  continue
+              try:
+                  payload, _ = decoder.raw_decode(raw[index:])
+                  break
+              except json.JSONDecodeError:
+                  continue
+          if not isinstance(payload, dict):
+              raise SystemExit("copilot-verify-pr.json did not contain a JSON object")
+          task_id = str(payload.get("task_id") or "")
+          result = str(payload.get("result") or "")
+          if not task_id or not result:
+              raise SystemExit("copilot-verify-pr.json missing task_id/result")
+
+          def has_task_table(path: Path) -> bool:
+              with sqlite3.connect(path) as conn:
+                  row = conn.execute(
+                      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='copilot_tasks'"
+                  ).fetchone()
+                  return row is not None
+
+          if not has_task_table(verified_db):
+              verified_db.write_bytes(source_db.read_bytes())
+          with sqlite3.connect(verified_db) as conn:
+              conn.execute(
+                  """
+                  UPDATE copilot_tasks
+                  SET state = ?,
+                      verification_status = ?,
+                      verification_run_url = ?,
+                      pr_number = ?,
+                      pr_url = ?,
+                      updated_at = CURRENT_TIMESTAMP
+                  WHERE task_id = ?
+                  """,
+                  (
+                      result,
+                      result,
+                      str(payload.get("run_url") or ""),
+                      payload.get("pr_number"),
+                      str(payload.get("pr_url") or ""),
+                      task_id,
+                  ),
+              )
+              if conn.total_changes == 0:
+                  raise SystemExit(f"copilot_tasks has no row for {task_id}")
+              conn.execute(
+                  """
+                  INSERT INTO copilot_task_events (task_id, source, delivery_id, event_type, event_json)
+                  VALUES (?, 'reachable-workflow', NULL, 'verification_artifact_normalized', ?)
+                  """,
+                  (task_id, json.dumps(payload, sort_keys=True)),
+              )
+              conn.commit()
+          PY
           if [ -f dispatch-artifacts/copilot-dispatch.json ]; then
             cp dispatch-artifacts/copilot-dispatch.json .reachable/ci-artifacts/copilot-dispatch.json
           fi
@@ -235,7 +304,10 @@ jobs:
               proof.execute("DROP TABLE IF EXISTS copilot_tasks")
               create_sql = proof.execute(
                   "SELECT sql FROM taskdb.sqlite_master WHERE type='table' AND name='copilot_tasks'"
-              ).fetchone()[0]
+              ).fetchone()
+              if create_sql is None or not create_sql[0]:
+                  raise SystemExit("copilot_tasks DDL is missing from the verified Copilot task DB")
+              create_sql = create_sql[0]
               proof.execute(create_sql)
               proof.execute("INSERT INTO copilot_tasks SELECT * FROM taskdb.copilot_tasks")
               events = proof.execute(
