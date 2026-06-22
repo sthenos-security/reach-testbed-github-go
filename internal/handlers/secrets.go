@@ -16,7 +16,8 @@ func ServiceToken(w http.ResponseWriter, _ *http.Request) {
 func CloudTokens(w http.ResponseWriter, _ *http.Request) {
 	githubToken := os.Getenv("REACH_TESTBED_GITHUB_TOKEN")
 	if githubToken == "" {
-		githubToken = "not-configured"
+		http.Error(w, "github token not configured", http.StatusServiceUnavailable)
+		return
 	}
 	// Synthetic fixture values only. These are not real credentials.
 	_ = json.NewEncoder(w).Encode(map[string]string{

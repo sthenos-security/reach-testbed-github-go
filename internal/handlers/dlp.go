@@ -10,7 +10,15 @@ import (
 func SupportExport(w http.ResponseWriter, _ *http.Request) {
 	ssn := "123-45-6789"
 	dob := "1978-04-23"
-	log.Printf("Processing patient ssn=***-**-%s dob=%s", ssn[len(ssn)-4:], dob[:4]+"-**-**")
+	ssnLast4 := ""
+	if len(ssn) >= 4 {
+		ssnLast4 = ssn[len(ssn)-4:]
+	}
+	dobYear := ""
+	if len(dob) >= 4 {
+		dobYear = dob[:4]
+	}
+	log.Printf("Processing patient ssn=***-**-%s dob=%s-**-**", ssnLast4, dobYear)
 	payload, _ := json.Marshal(map[string]string{"record": "processed"})
 	_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
 
