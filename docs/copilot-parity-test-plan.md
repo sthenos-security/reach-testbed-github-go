@@ -84,6 +84,22 @@ This is the active task shape to prove next. The fresh `reach-core` candidate
 build for that proof was triggered as run `27973261407` on branch
 `agent-plugin-alpha-proof`.
 
+## Shard Design Rules
+
+Copilot sharding should follow the same remediation ordering used for the other
+agent lanes instead of inventing a Copilot-only batching strategy:
+
+1. Order by priority lane first: `EXPLOITABLE_NOW`, then reachable critical
+   source findings, then dependency sweeps, then lower-priority cleanup.
+2. Preserve affinity groups. If one package upgrade or one shared remediation
+   action clears multiple findings, keep that work in the same task.
+3. Keep same-file follow-on findings attached to the earlier higher-priority
+   shard for that file when the fix path is shared.
+4. Keep dependency-only upgrades separate from source-code exploit-path shards
+   unless shard-count overflow forces a small adjacent merge.
+5. Use the shard count to cap task size, not to flatten priority. The highest
+   exploitability work should still be dispatched first.
+
 ## Required Run Set
 
 The parity campaign should use the following sequence:
