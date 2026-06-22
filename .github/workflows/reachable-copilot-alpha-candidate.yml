@@ -1,6 +1,8 @@
 # Go-demo Copilot proof against a non-published Reachable alpha candidate dist.
 # This workflow consumes the two-wheel reach-core Test Release artifact directly;
 # it does not publish to reach-dist and does not use reach-ci-github as a target app.
+# A successful campaign can create multiple Copilot PRs because REACHABLE
+# dispatches one bounded Copilot task per remediation shard.
 name: "Run Demo (Copilot Alpha Candidate)"
 
 on:

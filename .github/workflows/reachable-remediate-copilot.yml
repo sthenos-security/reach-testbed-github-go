@@ -1,6 +1,8 @@
 # Generated from the Reachable GitHub demo wrapper.
-# This is the async GitHub Copilot cloud-agent dispatch lane. Copilot PRs still
-# require a separate REACHABLE verification pass before they are considered ready.
+# This is the async GitHub Copilot cloud-agent dispatch lane. One dispatch run can
+# create multiple Copilot PRs: one PR per REACHABLE remediation shard. Copilot PRs
+# still require a separate REACHABLE verification pass before they are considered
+# ready.
 name: "Run Demo (Copilot Dispatch)"
 
 on:

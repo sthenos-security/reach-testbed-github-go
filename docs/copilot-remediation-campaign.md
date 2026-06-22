@@ -20,6 +20,27 @@ The product claim is not that Copilot creates one monolithic PR. The product
 claim is that REACHABLE turns prioritized risk into bounded Copilot tasks,
 verifies each PR, and produces campaign-level proof.
 
+## Multiple PRs Are Expected
+
+Copilot campaign mode can create multiple PRs from one dispatch run. This is
+intentional. Each PR corresponds to one REACHABLE remediation shard, not to the
+whole scan.
+
+REACHABLE shards findings so that Copilot gets bounded work:
+
+- exploitable and release-blocking findings come first;
+- findings that share one dependency upgrade stay together;
+- findings that need coordinated edits in the same file or handler family stay
+  together;
+- dependency-only changes stay separate from source-code exploit-path changes
+  unless REACHABLE explicitly groups them;
+- unrelated risky edits are split so a weak Copilot result does not block the
+  whole campaign.
+
+The campaign is complete only when all required Copilot PRs pass
+`Verify Copilot PR` and the aggregate `Agent Parity Check` shows the same
+security outcome as the Codex and Claude lanes.
+
 ## Current Campaign Shape
 
 The current Go campaign dispatches five Copilot tasks:
@@ -93,4 +114,3 @@ GitHub does not provide a native permission that says a token may merge only
 source branches matching `copilot/rch-task-*`. The safe control is therefore
 policy gating inside REACHABLE plus normal branch protection, not giving
 Copilot broad merge rights.
-

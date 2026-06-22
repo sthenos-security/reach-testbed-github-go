@@ -54,9 +54,9 @@ workflow here with `remediate=false`.
 |------------------------|------------------|---------------|
 | `Run Demo (Codex)` | Scan the vulnerable release candidate, create a fix branch, test it, rescan it, open or prepare a PR, and publish the verdict status page with the Codex/OpenAI lane. | Yes |
 | `Run Demo (Claude)` | Run the same remediation demo with the Claude/Anthropic lane so GitHub clearly shows support for both providers. | Yes |
-| `Run Demo (Copilot Dispatch)` | Scan the vulnerable release candidate and dispatch bounded GitHub Copilot cloud-agent issues/tasks from DB-backed evidence. Copilot PRs require later REACHABLE verification before they are considered ready. | Yes |
+| `Run Demo (Copilot Dispatch)` | Scan the vulnerable release candidate and dispatch bounded GitHub Copilot cloud-agent issues/tasks from DB-backed evidence. This can create multiple Copilot PRs: one PR per REACHABLE shard. Copilot PRs require later REACHABLE verification before they are considered ready. | Yes |
 | `Run Demo (Copilot E2E)` | Run the proof-gated Copilot demo from this Go repo and fail unless the published artifact contains at least one dispatched Copilot task with a GitHub issue/task identifier. | Yes |
-| `Run Demo (Copilot Alpha Candidate)` | Install a non-published reach-core Test Release candidate dist directly and prove Copilot dispatch from this Go repo before any Marketplace rollout. | Yes |
+| `Run Demo (Copilot Alpha Candidate)` | Install a non-published reach-core Test Release candidate dist directly and prove Copilot dispatch from this Go repo before any Marketplace rollout. Like the normal Copilot dispatch lane, this can create multiple PRs for one remediation campaign. | Yes |
 | `Run Demo (Copilot Bundle Replay)` | Re-dispatch Copilot from a saved bundle and pre-dispatch DB artifact so prompt/task changes can be tested without another full Reachable scan. | Yes |
 | `Dispatch Copilot PR Verification` | Trusted scheduled/manual workflow that finds open Copilot PRs and dispatches `Verify Copilot PR` from `main`, avoiding PR-event approval gates for bot-authored PRs. | Yes |
 | `Agent Parity Check` | Compare Codex, Claude, and Copilot proof artifacts by verified security outcome instead of diff text. | Yes |
@@ -201,6 +201,9 @@ The first product-cut Copilot model is documented in
 [docs/copilot-remediation-campaign.md](docs/copilot-remediation-campaign.md):
 REACHABLE dispatches one bounded task per shard, Copilot opens one PR per task,
 REACHABLE verifies each PR, and parity is proven at the campaign level.
+Multiple Copilot PRs are therefore expected behavior, not a duplicate-dispatch
+bug, when a scan contains findings that REACHABLE separates by priority,
+dependency affinity, file affinity, or remediation risk.
 These helper scripts keep the release-gate logic auditable and testable outside
 GitHub Actions:
 
@@ -225,7 +228,7 @@ GitHub Actions:
 | What is this repo? | A controlled vulnerable Go application used to demonstrate Reachable CI scanning, autonomous remediation, and DB-backed proof that a remediation branch is clean. |
 | What do I configure? | Add one AI key as a repository secret: `OPENAI_API_KEY` for `openai-codex` / Codex (OpenAI), or `ANTHROPIC_API_KEY` for `anthropic-claude` / Claude Code (Anthropic). Add `MCP_GITHUB_TOKEN` when you want read-only GitHub source access, MCP GitHub cloning, and package git clone fallback. Optional workflow inputs are listed below. |
 | How does the PR open? | The demo default is automatic PR creation with the workflow `GITHUB_TOKEN`. Set `create_pr=false` to publish proof and open the PR manually from the `reachable-remediate-*` branch. Branch protection and reviews still control merge. |
-| How does Copilot remediation merge? | Copilot opens one PR per REACHABLE shard. Maintainers merge verified Copilot PRs after `Verify Copilot PR` and `Agent Parity Check` pass. Auto-merge is not a default; it is an opt-in roadmap feature for customers that grant a trusted REACHABLE workflow or GitHub App merge permission. |
+| How does Copilot remediation merge? | Copilot can open multiple PRs for one remediation campaign: one PR per REACHABLE shard. Maintainers merge verified Copilot PRs after `Verify Copilot PR` and `Agent Parity Check` pass. Auto-merge is not a default; it is an opt-in roadmap feature for customers that grant a trusted REACHABLE workflow or GitHub App merge permission. |
 | Where is the CI pipeline? | [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml) for Codex and [.github/workflows/reachable-remediate-claude.yml](.github/workflows/reachable-remediate-claude.yml) for Claude. Both scan, optionally remediate, rescan, verify the DB proof, and publish sanitized evidence. |
 | Where do I run it? | GitHub Actions → [Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate.yml) or [Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-claude.yml). |
 | Where are the verdict and artifacts? | [Public verdict status page](https://sthenos-security.github.io/reach-testbed-github-go/) and [published artifacts](https://sthenos-security.github.io/reach-testbed-github-go/#artifacts). |
