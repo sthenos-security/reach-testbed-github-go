@@ -197,6 +197,10 @@ and DB-backed verification is recorded by [.github/workflows/reachable-copilot-p
 Cross-agent parity comparison is tracked in [docs/copilot-parity-test-plan.md](docs/copilot-parity-test-plan.md)
 and executed by [.github/workflows/reachable-agent-parity.yml](.github/workflows/reachable-agent-parity.yml)
 with [ci/check-agent-parity.py](ci/check-agent-parity.py).
+The first product-cut Copilot model is documented in
+[docs/copilot-remediation-campaign.md](docs/copilot-remediation-campaign.md):
+REACHABLE dispatches one bounded task per shard, Copilot opens one PR per task,
+REACHABLE verifies each PR, and parity is proven at the campaign level.
 These helper scripts keep the release-gate logic auditable and testable outside
 GitHub Actions:
 
@@ -221,6 +225,7 @@ GitHub Actions:
 | What is this repo? | A controlled vulnerable Go application used to demonstrate Reachable CI scanning, autonomous remediation, and DB-backed proof that a remediation branch is clean. |
 | What do I configure? | Add one AI key as a repository secret: `OPENAI_API_KEY` for `openai-codex` / Codex (OpenAI), or `ANTHROPIC_API_KEY` for `anthropic-claude` / Claude Code (Anthropic). Add `MCP_GITHUB_TOKEN` when you want read-only GitHub source access, MCP GitHub cloning, and package git clone fallback. Optional workflow inputs are listed below. |
 | How does the PR open? | The demo default is automatic PR creation with the workflow `GITHUB_TOKEN`. Set `create_pr=false` to publish proof and open the PR manually from the `reachable-remediate-*` branch. Branch protection and reviews still control merge. |
+| How does Copilot remediation merge? | Copilot opens one PR per REACHABLE shard. Maintainers merge verified Copilot PRs after `Verify Copilot PR` and `Agent Parity Check` pass. Auto-merge is not a default; it is an opt-in roadmap feature for customers that grant a trusted REACHABLE workflow or GitHub App merge permission. |
 | Where is the CI pipeline? | [.github/workflows/reachable-remediate.yml](.github/workflows/reachable-remediate.yml) for Codex and [.github/workflows/reachable-remediate-claude.yml](.github/workflows/reachable-remediate-claude.yml) for Claude. Both scan, optionally remediate, rescan, verify the DB proof, and publish sanitized evidence. |
 | Where do I run it? | GitHub Actions → [Run Demo (Codex)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate.yml) or [Run Demo (Claude)](https://github.com/sthenos-security/reach-testbed-github-go/actions/workflows/reachable-remediate-claude.yml). |
 | Where are the verdict and artifacts? | [Public verdict status page](https://sthenos-security.github.io/reach-testbed-github-go/) and [published artifacts](https://sthenos-security.github.io/reach-testbed-github-go/#artifacts). |

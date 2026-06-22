@@ -40,6 +40,10 @@ All of the following must be true before the parity goal is considered complete:
 10. A parity comparison run reports that all three lanes reached the same
     verified security outcome, whether Copilot proves that through one PR or a
     verified multi-PR campaign.
+11. Agent prompts explicitly require mergeable PRs: scoped diffs, no broad
+    formatting sweeps, no unrelated renames/refactors, no unselected dependency
+    churn, and clear blocker reporting when a mergeable bounded fix is not
+    possible.
 
 ## Tracker
 
@@ -53,6 +57,29 @@ All of the following must be true before the parity goal is considered complete:
 | `reach-testbed-github-go` | Copilot high-quality remediation coverage | Codex / open | Copilot clears the same actionable release-blocker scope as Codex and Claude, including dependency/module-version remediation where required | Copilot post-fix `release-proof/summary.json` with zero release blockers, plus `agent-remediation-audit-log.json` showing selected signals and changed files | Current Copilot PR `#16` is narrow DLP-only; Codex PR `#17` and Claude PR `#18` addressed broader handler files and `go.mod`/`go.sum` | Broaden Copilot dispatch/campaign until coverage matches Codex and Claude outcomes |
 | `reach-testbed-github-go` | Cross-agent parity comparison | Codex / in progress | Comparator passes for Codex, Claude, and Copilot artifacts from the same parity campaign, with Copilot accepted either as one clean PR or as a fully verified multi-PR campaign that covers the same selected signals | `agent-parity-report.json` and aggregate `agent-remediation-audit-log.json` with `ok=true`, zero unresolved Copilot selected signals, and no mismatches | Run `27912378610` passed under the old narrow rule; local synthetic replay now proves the updated comparator can treat two verified Copilot PR artifacts as one clean campaign when their verified signal coverage resolves the full selected-signal set | Re-run parity once the live sharded Copilot campaign produces real verification artifacts |
 | `reach-testbed-github-go` | Trusted Copilot verification dispatcher | Codex / complete | A trusted `main` workflow finds Copilot PRs and dispatches `Verify Copilot PR` without loosening public PR approval policy | Successful `Dispatch Copilot PR Verification` run and successful spawned verifier for an `app/copilot-swe-agent` PR | Dispatcher run `27913235873` started verifier run `27913239123`; verifier succeeded and artifact `7778016209` has `verification_status=verified`; fixed dispatcher run `27913328451` succeeded and skipped PR `#16` because it found that verification artifact | Keep strict PR-event approval policy; use dispatcher for Copilot PR verification automation |
+| `reach-core` | Mergeable remediation prompt contract | Codex / in progress | Codex, Claude, and Copilot prompts instruct agents to produce mergeable scoped PRs and avoid cross-shard conflict churn | Prompt text and tests proving mergeability instructions are present | Local patch adds mergeability guidance to shared remediation prompts and Copilot issue/task bodies | Run focused prompt tests and include the fix in the next alpha build |
+| `reach-testbed-github-go` | Copilot merge policy documentation | Codex / complete | README documents multi-PR campaign mode, manual trusted merge, and auto-merge as an opt-in roadmap feature | `docs/copilot-remediation-campaign.md` plus README link | Added campaign doc with PRs `#22`-`#26`; live GitHub PR metadata reports all five are `MERGEABLE` with `mergeStateStatus=UNSTABLE` until verification/status checks run | Verify each PR before any merge |
+
+## Merge Policy
+
+The first product cut does not require Copilot to auto-merge. Copilot creates
+one PR per REACHABLE shard. REACHABLE verifies each PR, and maintainers may
+merge the verified PRs themselves according to normal repository policy.
+
+Manual maintainer merge is acceptable for this demo after the proof gates pass:
+
+1. `Verify Copilot PR` succeeds for the PR.
+2. `copilot-verify-pr.json` reports `verified`.
+3. The post-fix proof has zero selected blockers for that task.
+4. `go test ./...` evidence is present.
+5. The campaign parity report passes against Codex and Claude.
+
+Auto-merge is a roadmap feature, only for customers that request it and grant a
+trusted REACHABLE workflow or GitHub App the required repository permission.
+GitHub does not provide a native source-branch-only merge permission for
+`copilot/rch-task-*`; the control must be REACHABLE policy gates plus normal
+branch protection. Any future automation must use the verified PR head SHA via
+`--match-head-commit` to prevent post-verification drift.
 
 ## Live Campaign - 2026-06-21
 
@@ -84,6 +111,11 @@ current live dry run against alpha-proof artifact `27960935439` and the updated
 This is the active task shape to prove next. The fresh `reach-core` candidate
 build for that proof was triggered as run `27973261407` on branch
 `agent-plugin-alpha-proof`.
+
+The live alpha candidate run `27978630290` proved this five-task shape and
+Copilot opened PRs `#22` through `#26`. GitHub currently reports all five PRs
+as `MERGEABLE`; they are not product-ready until REACHABLE verification and the
+campaign parity check pass.
 
 ## Shard Design Rules
 
