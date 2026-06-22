@@ -8,6 +8,7 @@ import (
 )
 
 func SupportExport(w http.ResponseWriter, _ *http.Request) {
+	// ssn is a synthetic fixture value used only in the CSV export below.
 	ssn := "123-45-6789"
 	log.Printf("Processing patient ssn=[REDACTED] dob=[REDACTED]")
 	payload, _ := json.Marshal(map[string]string{"ssn": "[REDACTED]", "dob": "[REDACTED]"})

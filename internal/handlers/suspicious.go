@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -11,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // privateNets lists CIDR ranges that must not be reached by user-controlled URLs.
@@ -36,6 +39,60 @@ func init() {
 	}
 }
 
+// isPrivateIP returns true when the given IP falls in a private/loopback/link-local range.
+func isPrivateIP(ip net.IP) bool {
+	for _, network := range privateNets {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// ssrfSafeDialer is a net.Dialer that rejects connections to private/internal IPs,
+// eliminating the TOCTOU gap between hostname validation and the actual TCP dial.
+var ssrfSafeDialer = &net.Dialer{
+	Timeout:   10 * time.Second,
+	KeepAlive: 30 * time.Second,
+}
+
+func ssrfSafeDial(ctx context.Context, network, addr string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid address: %w", err)
+	}
+
+	// Block well-known metadata endpoints by name.
+	lower := strings.ToLower(host)
+	for _, blocked := range []string{"localhost", "metadata.google.internal", "metadata.azure.com"} {
+		if lower == blocked {
+			return nil, fmt.Errorf("host not allowed: %s", host)
+		}
+	}
+
+	// Resolve and validate each IP that the hostname maps to.
+	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, fmt.Errorf("cannot resolve host: %w", err)
+	}
+	for _, ipAddr := range ips {
+		if isPrivateIP(ipAddr.IP) {
+			return nil, fmt.Errorf("host resolves to a private address")
+		}
+	}
+
+	return ssrfSafeDialer.DialContext(ctx, network, net.JoinHostPort(host, port))
+}
+
+// safeFetchClient uses the SSRF-safe dialer so that every TCP connection is
+// validated at dial time, preventing DNS rebinding and TOCTOU attacks.
+var safeFetchClient = &http.Client{
+	Timeout: 15 * time.Second,
+	Transport: &http.Transport{
+		DialContext: ssrfSafeDial,
+	},
+}
+
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
 
@@ -45,12 +102,7 @@ func FetchTool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isPrivateHost(parsed.Hostname()) {
-		http.Error(w, "invalid url: host not allowed", http.StatusBadRequest)
-		return
-	}
-
-	resp, err := http.Get(source)
+	resp, err := safeFetchClient.Get(source)
 	if err != nil {
 		log.Printf("FetchTool: fetch error: %v", err)
 		http.Error(w, "fetch failed", http.StatusBadGateway)
@@ -74,48 +126,6 @@ func FetchTool(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, _ = w.Write([]byte(target + "\n"))
-}
-
-// isPrivateHost returns true for loopback, link-local, cloud-metadata, and private
-// network hostnames or IP addresses.
-func isPrivateHost(host string) bool {
-	// Block well-known metadata endpoints.
-	lower := strings.ToLower(host)
-	for _, blocked := range []string{"localhost", "metadata.google.internal", "metadata.azure.com"} {
-		if lower == blocked {
-			return true
-		}
-	}
-
-	// If the host parses as an IP address, check against private CIDR ranges.
-	ip := net.ParseIP(host)
-	if ip != nil {
-		for _, network := range privateNets {
-			if network.Contains(ip) {
-				return true
-			}
-		}
-		return false
-	}
-
-	// Resolve the hostname and check each resolved IP.
-	addrs, err := net.LookupHost(host)
-	if err != nil {
-		// Cannot resolve; block the request.
-		return true
-	}
-	for _, addr := range addrs {
-		ip := net.ParseIP(addr)
-		if ip == nil {
-			return true
-		}
-		for _, network := range privateNets {
-			if network.Contains(ip) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func SuspiciousMarkers(w http.ResponseWriter, _ *http.Request) {
