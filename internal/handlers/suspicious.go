@@ -14,9 +14,17 @@ import (
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
+	if source == "" {
+		http.Error(w, "url parameter is required", http.StatusBadRequest)
+		return
+	}
 
 	parsed, err := url.Parse(source)
-	if err != nil || parsed.Scheme != "https" {
+	if err != nil {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+	if parsed.Scheme != "https" {
 		http.Error(w, "invalid url: https scheme required", http.StatusBadRequest)
 		return
 	}
