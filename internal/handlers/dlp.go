@@ -9,7 +9,6 @@ import (
 
 func SupportExport(w http.ResponseWriter, _ *http.Request) {
 	ssn := "123-45-6789"
-	dob := "1978-04-23"
 	log.Print("Processing support export for synthetic patient record")
 	payload, _ := json.Marshal(map[string]string{
 		"event":            "support_export",
