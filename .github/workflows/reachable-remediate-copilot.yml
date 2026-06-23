@@ -28,7 +28,7 @@ permissions:
 
 jobs:
   reachable-copilot-dispatch:
-    uses: sthenos-security/reach-ci-github/.github/workflows/auto-remediate.yml@main
+    uses: sthenos-security/reach-ci-github/.github/workflows/auto-remediate.yml@v1
     with:
       target_branch: ${{ inputs.target_branch }}
       remediate: true

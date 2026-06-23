@@ -15,17 +15,16 @@ GitHub Marketplace action listing.
 
 | Repo | Role |
 |---|---|
-| [`REACHABLE Risk Exposure Reduction`](https://github.com/marketplace/actions/reachable-risk-exposure-reduction) | GitHub Marketplace action for customer installation after the rebuilt beta package is promoted. |
+| [`REACHABLE Risk Exposure Reduction`](https://github.com/marketplace/actions/reachable-risk-exposure-reduction) | GitHub Marketplace action for customer installation, including optional `copilot-github` remediation. |
 | [`reachable` GitLab Catalog component](https://gitlab.com/explore/catalog/sthenos-security-public/reach-testbed-gitlab-catalog) | GitLab Catalog component for customer installation. |
 | [`reach-testbed-github-marketplace`](https://github.com/sthenos-security/reach-testbed-github-marketplace) | GitHub Marketplace distribution repo plus the configurable root action. |
 | [`reach-ci-github`](https://github.com/sthenos-security/reach-ci-github) | Reusable GitHub Actions toolkit for production remediation workflows. |
 | `reach-testbed-github-go` | Public GitHub demo repo for full remediation proof and scan-only runs with remediation disabled. |
 
-Copilot campaign proof lives in this demo repo until the rebuilt beta package is
-promoted through the Marketplace action. Do not use this repo itself as the
-Marketplace listing; use it to prove scan, dispatch, PR verification, parity,
-and the no-auto-merge kill switch before packaging the same behavior for
-customer installs.
+Copilot campaign proof lives in this demo repo, while customer installs should
+use the Marketplace action. Do not use this repo itself as the Marketplace
+listing; use it to prove scan, dispatch, PR verification, parity, and the
+no-auto-merge kill switch for the same behavior exposed to customer installs.
 
 Contact [Sthenos Security](mailto:info@sthenosec.com?subject=Custom%20CI%2FCD%20integration)
 for custom CI/CD integration.
