@@ -15,7 +15,7 @@ func SupportExport(w http.ResponseWriter, _ *http.Request) {
 		"record_count":     "1",
 		"export_format":    "csv",
 		"data_class":       "synthetic_patient_record",
-		"retained_fields":  "name,email,ssn,phone,card_number,last4",
+		"shared_field_set": "customer_support_export_summary",
 		"redaction_status": "removed_before_telemetry",
 	})
 	_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
