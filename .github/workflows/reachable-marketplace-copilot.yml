@@ -1,0 +1,56 @@
+name: "Run Demo (Marketplace Copilot)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Base branch to scan and dispatch Copilot remediation tasks from
+        type: string
+        default: "main"
+      scan_mode:
+        description: Use real for full Reachable execution, or nop for Marketplace wiring smoke tests
+        type: string
+        default: "real"
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+  id-token: write
+  pages: write
+  pull-requests: write
+  security-events: write
+
+jobs:
+  marketplace-copilot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.target_branch }}
+
+      - name: Dispatch Copilot remediation through Marketplace action
+        uses: sthenos-security/reach-testbed-github-marketplace@v1
+        env:
+          MCP_GITHUB_TOKEN: ${{ secrets.MCP_GITHUB_TOKEN }}
+          REACHABLE_COPILOT_USER_TOKEN: ${{ secrets.REACHABLE_COPILOT_USER_TOKEN }}
+        with:
+          target-branch: ${{ inputs.target_branch }}
+          ai-mode: copilot-github
+          reachable-copilot-user-token: ${{ secrets.REACHABLE_COPILOT_USER_TOKEN }}
+          remediate: "true"
+          rescan-only: "false"
+          scan-mode: ${{ inputs.scan_mode }}
+          create-pr: "false"
+          publish-report: "true"
+          upload-artifacts: "true"
+          publish-pages: "false"
+          require-ai: "true"
+          fresh-scan: "true"
+          fail-on: exploitable
+          proof-fail-on: exploitable
+          prompt-profile: balanced
+          signal-types: all
+          max-batches: "1"
+          rescan-strategy: each_batch
