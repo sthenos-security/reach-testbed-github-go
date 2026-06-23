@@ -9,7 +9,7 @@ import (
 
 func SupportExport(w http.ResponseWriter, _ *http.Request) {
 	log.Print("Processing support export for synthetic patient record")
-	payload, _ := json.Marshal(map[string]string{
+	payload, err := json.Marshal(map[string]string{
 		"event":            "support_export",
 		"contains_pii":     "true",
 		"record_count":     "1",
@@ -18,6 +18,10 @@ func SupportExport(w http.ResponseWriter, _ *http.Request) {
 		"shared_field_set": "customer_support_export_summary",
 		"redaction_status": "removed_before_telemetry",
 	})
+	if err != nil {
+		http.Error(w, "failed to encode telemetry payload", http.StatusInternalServerError)
+		return
+	}
 	_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
 
 	w.Header().Set("Content-Type", "text/csv")
