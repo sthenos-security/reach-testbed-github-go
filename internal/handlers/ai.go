@@ -58,7 +58,7 @@ func AIAgentPlan(w http.ResponseWriter, r *http.Request) {
 func SafeAIAnswer(w http.ResponseWriter, r *http.Request) {
 	var req promptRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 	if strings.Contains(strings.ToLower(req.Question), "ignore previous") {
