@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -27,7 +28,7 @@ func AIAnswer(w http.ResponseWriter, r *http.Request) {
 
 	question, ok := normalizePromptInput(req.Question)
 	if !ok {
-		http.Error(w, "question must be between 1 and 500 characters", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("question must be between 1 and %d characters", maxPromptInputLength), http.StatusBadRequest)
 		return
 	}
 
@@ -56,7 +57,7 @@ func AIAgentPlan(w http.ResponseWriter, r *http.Request) {
 
 	task, ok := normalizePromptInput(req.Task)
 	if !ok {
-		http.Error(w, "task must be between 1 and 500 characters", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("task must be between 1 and %d characters", maxPromptInputLength), http.StatusBadRequest)
 		return
 	}
 
