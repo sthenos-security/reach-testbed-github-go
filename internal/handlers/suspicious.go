@@ -3,17 +3,50 @@ package handlers
 import (
 	"encoding/base64"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+
+	"github.com/reachable/reach-testbed-github-go/internal/safety"
 )
 
+var allowedFetchURLs = map[string]string{
+	"example.invalid":       "https://example.invalid/tool.bin",
+	"downloads.example.com": "https://downloads.example.com/tool.bin",
+}
+
 func FetchTool(w http.ResponseWriter, r *http.Request) {
-	source := r.URL.Query().Get("url")
-	resp, err := http.Get(source)
+	source := strings.TrimSpace(r.URL.Query().Get("url"))
+	parsed, err := url.Parse(source)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+	host := parsed.Hostname()
+	if !safety.AllowedHostname(host) {
+		http.Error(w, "invalid url host", http.StatusBadRequest)
+		return
+	}
+	fetchURL, ok := allowedFetchURLs[host]
+	if !ok {
+		http.Error(w, "unsupported url host", http.StatusBadRequest)
+		return
+	}
+
+	resp, err := http.Get(fetchURL)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		log.Printf("fetch tool request failed for %q: %v", fetchURL, err)
+		http.Error(w, "upstream fetch failed", http.StatusBadGateway)
+		return
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		log.Printf("fetch tool upstream non-success for %q: %d", fetchURL, resp.StatusCode)
+		http.Error(w, "upstream fetch failed", http.StatusBadGateway)
+		_ = resp.Body.Close()
 		return
 	}
 	defer resp.Body.Close()
@@ -21,13 +54,15 @@ func FetchTool(w http.ResponseWriter, r *http.Request) {
 	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
 	out, err := os.Create(target)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("fetch tool create failed: %v", err)
+		http.Error(w, "unable to stage tool", http.StatusInternalServerError)
 		return
 	}
 	defer out.Close()
 
 	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("fetch tool copy failed: %v", err)
+		http.Error(w, "unable to stage tool", http.StatusInternalServerError)
 		return
 	}
 
