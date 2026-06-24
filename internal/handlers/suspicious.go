@@ -2,36 +2,30 @@ package handlers
 
 import (
 	"encoding/base64"
-	"io"
+	"encoding/json"
+	"errors"
 	"net/http"
-	"os"
+	"net/url"
 	"os/exec"
-	"path/filepath"
 )
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
-	resp, err := http.Get(source)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
-		return
-	}
-	defer resp.Body.Close()
-
-	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
-	out, err := os.Create(target)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if source != "" {
+		parsed, err := url.Parse(source)
+		if err != nil {
+			writeBadRequest(w, "FetchTool url parse", err)
+			return
+		}
+		if parsed.Scheme != "https" || parsed.Host == "" {
+			writeBadRequest(w, "FetchTool url scheme", errors.New("url must use https"))
+			return
+		}
 	}
 
-	_, _ = w.Write([]byte(target + "\n"))
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"status": "fetch disabled",
+	})
 }
 
 func SuspiciousMarkers(w http.ResponseWriter, _ *http.Request) {
