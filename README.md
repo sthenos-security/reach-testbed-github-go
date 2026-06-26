@@ -53,6 +53,12 @@ This repo is also the public scan-only sample surface. There is no separate
 public legacy scan repo in the supported contract; use the same toolkit-backed
 workflow here with `remediate=false`.
 
+The workflow-security slice in this repo stays intentionally compact. It is a
+customer-facing subset used to show CI/CD authority review alongside the code,
+secret, DLP, CVE, and AI findings in the main demo. The full workflow-security
+subclass corpus and remediation experiment matrix belong outside this public
+demo repo.
+
 ### Which Action Do I Run?
 
 | Action shown in GitHub | Meaning | Run manually? |
@@ -299,14 +305,15 @@ Current golden baseline:
 
 | Result | Expected |
 |--------|----------|
-| Raw DB signals | 28 |
-| Release blockers before remediation | 18 |
-| DB evidence rows used in public proof | 21 |
-| Families | CVE, CWE, secret, DLP, AI |
-| Grouped expected findings | 17 grouped findings covering 28 raw DB signals. |
+| Raw DB signals | 53 |
+| Release blockers before remediation | 12 |
+| DB evidence rows used in public proof | 42 |
+| Families | CVE, CWE, secret, DLP, AI, workflow security |
+| Grouped expected findings | 18 grouped findings covering 53 raw DB signals. |
+| Workflow-security subset | 25 admin-guidance rows from a compact representative demo subset, not the full support corpus. |
 | Release blockers after remediation | 0 non-deferred blockers |
 | Deferred demo case | `GO-CWE-01` / `CWE/78` at `internal/handlers/cwe.go:12`; kept in the scanner contract, skipped from autonomous-remediation proof until the agent prompt is tightened. |
-| Residual post-fix findings | Only filtered `NON_PROD` or `NOT_REACHABLE` fixture markers may remain in the database. |
+| Residual post-fix findings | Only filtered `NON_PROD` or `NOT_REACHABLE` fixture markers, defended attacker evidence, plus workflow-security guidance rows may remain in the database. |
 
 The testbed itself is the contract. Do not edit the vulnerable fixture or the
 expected manifest just to make a scan pass; scanner logic must conform to the

@@ -99,6 +99,11 @@ def _action_required(rows: list[sqlite3.Row], db_path: Path, scan_id: int) -> di
 
     selected = []
     for row in rows:
+        if str(row["signal_type"] or "").lower() == "workflow_security":
+            # Workflow-security rows stay visible in this compact public demo
+            # as a small representative guidance subset. They count in DB
+            # totals, but they are not autonomous code-remediation blockers.
+            continue
         state = str(row["app_reachability"] or "UNKNOWN").upper()
         prod = str(row["prod_status"] or "UNKNOWN").upper()
         if state not in {"EXPLOITABLE", "REACHABLE", "UNKNOWN"}:
@@ -183,7 +188,7 @@ def validate(args: argparse.Namespace) -> int:
     for result in results:
         row = _sarif_tuple(result)
         rel = str(row[4])
-        for marker in ("/internal/", "/cmd/", "/config/", "/deploy/", "/testdata/"):
+        for marker in ("/internal/", "/cmd/", "/config/", "/deploy/", "/testdata/", "/.github/"):
             if marker in rel:
                 rel = rel.split(marker, 1)[1]
                 rel = marker.strip("/") + "/" + rel

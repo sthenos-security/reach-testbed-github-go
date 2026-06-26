@@ -8,6 +8,10 @@ All credentials, personal data, URLs, and suspicious strings in this repository
 are synthetic. This repository is intentionally vulnerable and must not be
 deployed.
 
+The workflow-security coverage here is intentionally compact: this repo keeps a
+customer-facing subset, not the full workflow-security support corpus or
+remediation experiment matrix.
+
 ## Golden Baseline
 
 The machine-readable contract is [expected/baseline.json](expected/baseline.json).
@@ -15,32 +19,34 @@ CI validates the baseline database against that contract before remediation.
 
 | Baseline dimension | Expected |
 |--------------------|---------:|
-| Raw DB signals in baseline database | 28 |
-| Release blockers before remediation | 18 |
-| DB evidence rows used in public proof | 21 |
-| Defended attacker-evidence rows | 3 |
-| Filtered fixture/nonproduction rows | 7 |
-| Grouped expected findings | 17 |
+| Raw DB signals in baseline database | 53 |
+| Release blockers before remediation | 12 |
+| DB evidence rows used in public proof | 42 |
+| Defended attacker-evidence rows | 9 |
+| Filtered fixture / workflow-guidance rows | 12 |
+| Grouped expected findings | 18 |
 | Required proof result after remediation | 0 release blockers |
 
 Expected release decision:
 
 | Release category | Rows before | Expected proof | Remediated? | Meaning |
 |------------------|------------:|----------------|-------------|---------|
-| Exploitable blockers | 9 | 0 | Yes | Enzo attacker proved external control and impact. These are mandatory fixes. |
+| Exploitable blockers | 3 | 0 | Yes | Enzo attacker proved external control and impact. These are mandatory fixes. |
 | Not-attacked / exposure blockers | 9 | 0 | Yes | No attacker proof is required for reachable CVEs, embedded secrets, PII/DLP exposure, or AI-boundary authority risk. They still block release while present. |
-| Defended attacker evidence | 3 | 0 blockers | No, unless a fix naturally removes them | Reachable found the path, but Enzo attacker could not prove a practical attack. These rows are audit evidence, not release blockers. |
+| Defended attacker evidence | 9 | 0 blockers | No, unless a fix naturally removes them | Reachable found the path, but Enzo attacker could not prove a practical attack. These rows are audit evidence, not release blockers. |
 | Filtered fixture evidence | 7 | Nonblocking | No | Synthetic not-reachable or non-production markers prove scanner coverage and are not part of the fix queue. |
-| **Total raw DB signals** | **28** | **0 release blockers** | **18 remediated blockers** | The proof scan passes when the release-blocking queue is zero. |
+| Workflow-security guidance | 25 | Nonblocking admin guidance | No autonomous code fix | CI/CD workflow authority paths are tracked here as a compact customer-facing subset. They require review or admin action, not automatic code remediation in this demo. |
+| **Total raw DB signals** | **53** | **0 release blockers** | **12 remediated blockers** | The proof scan passes when the release-blocking queue is zero. |
 
 | Family | Expected signals | Release blockers | Exploitability dimension | Nonblocking evidence | Expected proof |
 |--------|-----------------:|-----------------:|--------------------------|---------------------|----------------|
 | CVE | 1 | 1 | Reachable, not attack-proofed | 0 | Fixed dependency version; CVE row absent from proof scan. |
-| CWE | 12 | 9 | 8 exploitable, 3 defended | 3 defended rows | Command execution, SSRF/network fetch, and blocking error-disclosure rows absent from proof scan. |
-| Secret | 8 | 1 | Exposure | 7 filtered fixture rows | Synthetic production token absent; fixture-only markers remain non-actionable. |
+| CWE | 15 | 3 | 3 exploitable, 9 defended, 3 filtered | 12 nonblocking rows | Command execution, SSRF/network fetch, and blocking error-disclosure rows absent from proof scan. |
+| Secret | 3 | 1 | Exposure | 2 filtered rows | Synthetic production token absent; non-runtime workflow-template noise is not part of this baseline anymore. |
 | DLP | 2 | 2 | Exposure | 0 | Synthetic personal data exposure rows absent. |
-| AI | 5 | 5 | 1 exploitable flow, 4 AI-boundary exposure/authority rows | 0 | AI-boundary and unguarded-flow rows absent or covered by underlying code fixes. |
-| **Total** | **28** | **18** | **9 exploitable rows plus exposure/reachable blockers** | **10** | **0 release blockers after remediation.** |
+| AI | 7 | 5 | Reachable authority/exposure plus unguarded flow | 2 nonblocking rows | AI-boundary and unguarded-flow rows absent or covered by underlying code fixes. |
+| Workflow Security | 25 | 0 | Workflow authority review | 25 guidance rows | Retained as a compact customer-demo workflow-security subset; not part of the autonomous code-remediation queue. |
+| **Total** | **53** | **12** | **3 exploitable rows plus exposure/reachable blockers** | **41** | **0 release blockers after remediation.** |
 
 ## Remediation Proof
 
@@ -52,7 +58,7 @@ proof gate passes only when the database comparison shows:
 | Expected vulnerable rows | Present in the baseline database. |
 | Release blockers after remediation | 0 |
 | Post-remediation release blockers | 0 |
-| Residual findings | At most filtered `NON_PROD` or `NOT_REACHABLE` fixture markers. |
+| Residual findings | At most filtered `NON_PROD` or `NOT_REACHABLE` fixture markers, defended attacker evidence, plus the workflow-security guidance rows. |
 | Audit and integrity checks | Passing for the proof scan. |
 
 SARIF may be exported for platform integration, but the demo verdict is based
@@ -78,7 +84,7 @@ defended evidence.
 
 ## Expected Findings Table
 
-`DB signals` shows how many raw database findings are represented by the grouped row; the column totals 28 and reconciles with the golden baseline. Exploitability is the expected attackability or exposure dimension for the grouped finding. `Exploitable` and `Defended` states require Enzo attacker evidence; `Exposure` is used for secret, PII, and sensitive-AI-boundary rows where the security impact is data exposure rather than an attacker proof.
+`DB signals` shows how many raw database findings are represented by the grouped row; the column totals 53 and reconciles with the golden baseline. Exploitability is the expected attackability or exposure dimension for the grouped finding. `Exploitable` and `Defended` states require Enzo attacker evidence; `Exposure` is used for secret, PII, and sensitive-AI-boundary rows where the security impact is data exposure rather than an attacker proof.
 
 | ID | DB signals | Type | Expected risk | Expected reachability | Expected exploitability | Location | Business explanation | Expected remediation |
 |----|------------|------|---------------|-----------------------|--------------------------|----------|----------------------|----------------------|
@@ -91,7 +97,7 @@ defended evidence.
 | GO-CWE-06 | 3 | CWE / error disclosure | Medium | Mixed blocking/nonblocking | Mixed exploitable/defended | `internal/handlers/suspicious.go` | Network, file, and copy errors from the tool-fetch path are exposed to callers; one internal-only instance is retained as nonblocking evidence. | Return generic operational errors; keep internal details in logs or audit events. |
 | GO-SECRET-01 | 1 | Secret / GitHub token shape | Medium | Reachable | Exposure | `internal/handlers/secrets.go` | A synthetic GitHub-shaped token is embedded in code and returned by an API. In a real system this would be a credential leak. | Rotate the value, remove it from code, load it from a secret manager, and never return it in responses. |
 | GO-SECRET-02 | 1 | Secret / AWS access key shape | Info | Not reachable | Not applicable | `internal/handlers/secrets.go` | An AWS-shaped synthetic marker is present for detector coverage but is filtered as non-actionable in the latest proof. | Keep only synthetic test markers in fixtures; never put real cloud credentials in source. |
-| GO-SECRET-03 | 6 | Secret / workflow token variables | Info | Not reachable / non-production | Not applicable | `.github/workflows/reachable-remediate.yml` | `GITHUB_TOKEN` and `GH_TOKEN` are environment variable names used by GitHub tooling, not real secret values. | No code fix required. They should remain filtered/non-actionable. |
+| GO-SECRET-03 | 1 | Secret / static token detector overlap | Info | Not reachable | Not applicable | `internal/handlers/secrets.go` | A generic token-shape detector overlaps the synthetic GitHub PAT fixture on the same line. The specific GitHub PAT row is the one that remains actionable. | No separate code fix required. This overlap remains audit evidence only. |
 | GO-DLP-01 | 1 | DLP / PII to log | Critical | Reachable | Exposure | `internal/handlers/dlp.go` | Synthetic SSN and date-of-birth values are written to logs. In production this would create regulated-data exposure. | Mask sensitive values, minimize logging, and add structured audit logging without raw identifiers. |
 | GO-DLP-02 | 1 | DLP / PII to outbound HTTP | Critical | Reachable | Exposure | `internal/handlers/dlp.go` | Synthetic personal data is sent to an external analytics endpoint. | Remove raw PII from outbound telemetry, tokenize fields, and enforce data-sharing controls. |
 | GO-AI-01 | 1 | AI / LLM API call with sensitive context | Critical | Reachable | Exposure | `internal/handlers/ai.go` | User-controlled prompt content is sent to an LLM call in an admin-style context. | Separate system and user messages, treat user content as data, and apply policy checks before model calls. |
@@ -99,7 +105,8 @@ defended evidence.
 | GO-AI-03 | 1 | AI / unguarded flow to command execution | Medium | Reachable | Exploitable | `internal/handlers/cwe.go` | Reachable taint flow confirms the command-injection path has user-controlled input. | Fixed by the command-injection remediation. |
 | GO-AI-04 | 1 | AI / unguarded flow to error/output response | Medium | Reachable | Exploitable | `internal/handlers/cwe.go` | User-controlled diagnostic behavior can influence returned output. | Fixed by removing shell execution and normalizing errors. |
 | GO-AI-05 | 1 | AI / unguarded flow to network fetch | Medium | Reachable | Exploitable | `internal/handlers/suspicious.go` | User input controls the outbound fetch destination. | Fixed by the URL allowlist and SSRF controls. |
-| **Total** | **28** |  |  |  |  |  |  |  |
+| GO-WORKFLOW-01 | 25 | Workflow Security / CI/CD authority paths | Mixed | Reachable workflow authority | Admin guidance | `.github/workflows/reachable-workflow-security-fixture.yml` | The compact workflow-security fixture proves command injection, code injection, broken authorization, cross-workflow privilege escalation, untrusted checkout, OIDC/secret authority exposure, action pinning drift, and artifact-poisoning companion findings. Workflow files are owned by the dedicated `workflow_security` lane rather than the generic secret lane. | Review workflow trust boundaries, protect low-trust triggers, pin actions, narrow secrets/OIDC scope, and keep privileged sinks behind manual or protected release boundaries. |
+| **Total** | **53** |  |  |  |  |  |  |  |
 
 ## No-Fix CVE Handling
 

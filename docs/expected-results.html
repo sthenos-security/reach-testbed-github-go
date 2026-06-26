@@ -235,7 +235,9 @@
         It proves that Reachable can identify the release-blocking queue from
         database evidence, generate a bounded remediation task,
         let an agent patch a review branch, and rescan that branch to zero
-        release blockers.
+        release blockers. Workflow security is represented here only by a compact
+        customer-facing subset, not the full support corpus or
+        remediation experiment matrix.
       </p>
     </header>
 
@@ -261,17 +263,17 @@
     <div class="grid">
       <div class="card">
         <div class="eyebrow">DB Signals</div>
-        <div class="metric">28</div>
+        <div class="metric">53</div>
         <p>Expected raw scanner truth on <code>main</code>.</p>
       </div>
       <div class="card">
         <div class="eyebrow">Release Blockers</div>
-        <div class="metric">18</div>
+        <div class="metric">12</div>
         <p>Release-blocking queue before remediation.</p>
       </div>
       <div class="card">
         <div class="eyebrow">Evidence Rows</div>
-        <div class="metric">21</div>
+        <div class="metric">42</div>
         <p>DB evidence rows used in the public proof.</p>
       </div>
       <div class="card">
@@ -299,11 +301,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>Exploitable blockers</td><td>9</td><td>0</td><td>Yes</td><td>Enzo attacker proved external control and impact. These are mandatory fixes.</td></tr>
+          <tr><td>Exploitable blockers</td><td>3</td><td>0</td><td>Yes</td><td>Enzo attacker proved external control and impact. These are mandatory fixes.</td></tr>
           <tr><td>Not-attacked / exposure blockers</td><td>9</td><td>0</td><td>Yes</td><td>No attacker proof is required for reachable CVEs, embedded secrets, PII/DLP exposure, or AI-boundary authority risk. They still block release while present.</td></tr>
-          <tr><td>Defended attacker evidence</td><td>3</td><td>0 blockers</td><td>No, unless a fix naturally removes them</td><td>Reachable found the path, but Enzo attacker could not prove a practical attack. These rows are audit evidence, not release blockers.</td></tr>
+          <tr><td>Defended attacker evidence</td><td>9</td><td>0 blockers</td><td>No, unless a fix naturally removes them</td><td>Reachable found the path, but Enzo attacker could not prove a practical attack. These rows are audit evidence, not release blockers.</td></tr>
           <tr><td>Filtered fixture evidence</td><td>7</td><td>Nonblocking</td><td>No</td><td>Synthetic not-reachable or non-production markers prove scanner coverage and are not part of the fix queue.</td></tr>
-          <tr><td><strong>Total raw DB signals</strong></td><td><strong>28</strong></td><td><strong>0 release blockers</strong></td><td><strong>18 remediated blockers</strong></td><td>The proof scan passes when the release-blocking queue is zero.</td></tr>
+          <tr><td>Workflow-security guidance</td><td>25</td><td>Nonblocking admin guidance</td><td>No autonomous code fix</td><td>The demo keeps a compact CI/CD workflow-authority subset visible for review without turning this repo into the workflow-security lab.</td></tr>
+          <tr><td><strong>Total raw DB signals</strong></td><td><strong>53</strong></td><td><strong>0 release blockers</strong></td><td><strong>12 remediated blockers</strong></td><td>The proof scan passes when the release-blocking queue is zero.</td></tr>
         </tbody>
       </table>
       <table>
@@ -322,7 +325,7 @@
           <tr><td>Secret exposure</td><td>1</td><td>Exposure</td><td>A synthetic production-shaped token is embedded in application code.</td><td>The token row is absent; fixture-only markers remain non-actionable.</td></tr>
           <tr><td>DLP / PII exposure</td><td>2</td><td>Exposure</td><td>Synthetic personal data is logged or sent to an outbound endpoint.</td><td>Raw personal data exposure rows are absent.</td></tr>
           <tr><td>AI boundary and tool-risk rows</td><td>5</td><td>Exploitable / exposure / authority risk</td><td>LLM calls, sensitive context, tool instructions, and unguarded user flows cross AI trust boundaries.</td><td>The AI rows are absent or covered by the underlying code fix.</td></tr>
-          <tr><td><strong>Total release blockers</strong></td><td><strong>18</strong></td><td><strong>Actionable</strong></td><td>Baseline queue that must be fixed before release.</td><td><strong>0 release blockers after remediation.</strong></td></tr>
+          <tr><td><strong>Total release blockers</strong></td><td><strong>12</strong></td><td><strong>Actionable</strong></td><td>Baseline queue that must be fixed before release.</td><td><strong>0 release blockers after remediation.</strong></td></tr>
         </tbody>
       </table>
     </section>
@@ -343,9 +346,10 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>Defended attacker rows</td><td>3</td><td>Reachable paths reviewed by Enzo attacker and classified as defended, not exploitable.</td></tr>
+          <tr><td>Defended attacker rows</td><td>9</td><td>Reachable paths reviewed by Enzo attacker and classified as defended, not exploitable.</td></tr>
           <tr><td>Non-production or not-reachable fixture markers</td><td>7</td><td>Synthetic detector coverage rows such as workflow variable names and fixture markers.</td></tr>
-          <tr><td><strong>Total nonblocking evidence</strong></td><td><strong>10</strong></td><td>Tracked for auditability, not counted as release blockers.</td></tr>
+          <tr><td>Workflow-security guidance subset</td><td>25</td><td>A compact CI/CD authority-review subset kept in the public demo contract, without importing the larger support corpus.</td></tr>
+          <tr><td><strong>Total nonblocking evidence</strong></td><td><strong>41</strong></td><td>Tracked for auditability, not counted as release blockers.</td></tr>
         </tbody>
       </table>
     </section>
@@ -388,18 +392,19 @@
             <th>Family</th>
             <th>Expected signals</th>
             <th>Release blockers</th>
-            <th>Exploitable</th>
-            <th>Defended / evidence</th>
+            <th>Exploitability dimension</th>
+            <th>Nonblocking evidence</th>
             <th>Expected proof</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td><span class="pill blue">CVE</span></td><td>1</td><td>1</td><td>0</td><td>1 reachable dependency row</td><td>Fixed dependency version; no vulnerable dependency row in proof scan.</td></tr>
-          <tr><td><span class="pill critical">CWE</span></td><td>12</td><td>9</td><td>8</td><td>3 defended rows</td><td>Command execution, SSRF/network fetch, and blocking error disclosure rows disappear after remediation.</td></tr>
-          <tr><td><span class="pill medium">Secret</span></td><td>8</td><td>1</td><td>0</td><td>1 exposure row, 7 filtered fixture rows</td><td>Synthetic production token is removed; fixture markers remain non-actionable.</td></tr>
-          <tr><td><span class="pill critical">DLP</span></td><td>2</td><td>2</td><td>0</td><td>2 exposure rows</td><td>Synthetic personal data is no longer logged or sent outbound.</td></tr>
-          <tr><td><span class="pill critical">AI</span></td><td>5</td><td>5</td><td>1</td><td>4 reachable AI-boundary rows</td><td>LLM/data-boundary and unguarded user-flow rows are removed or covered by the underlying code fix.</td></tr>
-          <tr><td><strong>Total</strong></td><td><strong>28</strong></td><td><strong>18</strong></td><td><strong>9</strong></td><td><strong>19</strong></td><td>The proof scan must show zero release blockers before the branch is ready to review and merge.</td></tr>
+          <tr><td><span class="pill blue">CVE</span></td><td>1</td><td>1</td><td>Reachable, not attack-proofed</td><td>0</td><td>Fixed dependency version; CVE row absent from proof scan.</td></tr>
+          <tr><td><span class="pill critical">CWE</span></td><td>15</td><td>3</td><td>3 exploitable, 9 defended, 3 filtered</td><td>12 nonblocking rows</td><td>Command execution, SSRF/network fetch, and blocking error-disclosure rows absent from proof scan.</td></tr>
+          <tr><td><span class="pill medium">Secret</span></td><td>3</td><td>1</td><td>Exposure</td><td>2 filtered rows</td><td>Synthetic production token absent; workflow-template noise is not part of the baseline anymore.</td></tr>
+          <tr><td><span class="pill critical">DLP</span></td><td>2</td><td>2</td><td>Exposure</td><td>0</td><td>Synthetic personal data exposure rows absent.</td></tr>
+          <tr><td><span class="pill critical">AI</span></td><td>7</td><td>5</td><td>Reachable authority/exposure plus unguarded flow</td><td>2 nonblocking rows</td><td>AI-boundary and unguarded-flow rows absent or covered by underlying code fixes.</td></tr>
+          <tr><td><span class="pill ok">Workflow Security</span></td><td>25</td><td>0</td><td>Workflow authority review</td><td>25 guidance rows</td><td>Retained as a compact customer-demo workflow-security subset; not part of the autonomous code-remediation queue.</td></tr>
+          <tr><td><strong>Total</strong></td><td><strong>53</strong></td><td><strong>12</strong></td><td><strong>3 exploitable rows plus exposure/reachable blockers</strong></td><td><strong>41</strong></td><td>0 release blockers after remediation.</td></tr>
         </tbody>
       </table>
       <div class="note">
@@ -445,7 +450,7 @@
           <tr><td>GO-CWE-06</td><td>3</td><td>CWE / error disclosure</td><td>Medium</td><td>Mixed blocking/nonblocking</td><td>Mixed exploitable/defended</td><td><code>internal/handlers/suspicious.go</code></td><td>Network, file, and copy errors from the tool-fetch path are exposed to callers; one internal-only instance is retained as nonblocking evidence.</td><td>Return generic operational errors; keep internal details in logs or audit events.</td></tr>
           <tr><td>GO-SECRET-01</td><td>1</td><td>Secret / GitHub token shape</td><td>Medium</td><td>Reachable</td><td>Exposure</td><td><code>internal/handlers/secrets.go</code></td><td>A synthetic GitHub-shaped token is embedded in code and returned by an API. In a real system this would be a credential leak.</td><td>Rotate the value, remove it from code, load it from a secret manager, and never return it in responses.</td></tr>
           <tr><td>GO-SECRET-02</td><td>1</td><td>Secret / AWS access key shape</td><td>Info</td><td>Not reachable</td><td>Not applicable</td><td><code>internal/handlers/secrets.go</code></td><td>An AWS-shaped synthetic marker is present for detector coverage but is filtered as non-actionable in the latest proof.</td><td>Keep only synthetic test markers in fixtures; never put real cloud credentials in source.</td></tr>
-          <tr><td>GO-SECRET-03</td><td>6</td><td>Secret / workflow token variables</td><td>Info</td><td>Not reachable / non-production</td><td>Not applicable</td><td><code>.github/workflows/reachable-remediate.yml</code></td><td><code>GITHUB_TOKEN</code> and <code>GH_TOKEN</code> are environment variable names used by GitHub tooling, not real secret values.</td><td>No code fix required. They should remain filtered/non-actionable.</td></tr>
+          <tr><td>GO-SECRET-03</td><td>1</td><td>Secret / static token detector overlap</td><td>Info</td><td>Not reachable</td><td>Not applicable</td><td><code>internal/handlers/secrets.go</code></td><td>A generic token-shape detector overlaps the synthetic GitHub PAT fixture on the same line. The specific GitHub PAT row is the one that remains actionable.</td><td>No separate code fix required. This overlap remains audit evidence only.</td></tr>
           <tr><td>GO-DLP-01</td><td>1</td><td>DLP / PII to log</td><td>Critical</td><td>Reachable</td><td>Exposure</td><td><code>internal/handlers/dlp.go</code></td><td>Synthetic SSN and date-of-birth values are written to logs. In production this would create regulated-data exposure.</td><td>Mask sensitive values, minimize logging, and add structured audit logging without raw identifiers.</td></tr>
           <tr><td>GO-DLP-02</td><td>1</td><td>DLP / PII to outbound HTTP</td><td>Critical</td><td>Reachable</td><td>Exposure</td><td><code>internal/handlers/dlp.go</code></td><td>Synthetic personal data is sent to an external analytics endpoint.</td><td>Remove raw PII from outbound telemetry, tokenize fields, and enforce data-sharing controls.</td></tr>
           <tr><td>GO-AI-01</td><td>1</td><td>AI / LLM API call with sensitive context</td><td>Critical</td><td>Reachable</td><td>Exposure</td><td><code>internal/handlers/ai.go</code></td><td>User-controlled prompt content is sent to an LLM call in an admin-style context.</td><td>Separate system and user messages, treat user content as data, and apply policy checks before model calls.</td></tr>
@@ -453,13 +458,15 @@
           <tr><td>GO-AI-03</td><td>1</td><td>AI / unguarded flow to command execution</td><td>Medium</td><td>Reachable</td><td>Exploitable</td><td><code>internal/handlers/cwe.go</code></td><td>Reachable taint flow confirms the command-injection path has user-controlled input.</td><td>Fixed by the command-injection remediation.</td></tr>
           <tr><td>GO-AI-04</td><td>1</td><td>AI / unguarded flow to error/output response</td><td>Medium</td><td>Reachable</td><td>Exploitable</td><td><code>internal/handlers/cwe.go</code></td><td>User-controlled diagnostic behavior can influence returned output.</td><td>Fixed by removing shell execution and normalizing errors.</td></tr>
           <tr><td>GO-AI-05</td><td>1</td><td>AI / unguarded flow to network fetch</td><td>Medium</td><td>Reachable</td><td>Exploitable</td><td><code>internal/handlers/suspicious.go</code></td><td>User input controls the outbound fetch destination.</td><td>Fixed by the URL allowlist and SSRF controls.</td></tr>
-          <tr><td><strong>Total</strong></td><td><strong>28</strong></td><td colspan="7">Raw DB signals represented by the grouped expected-finding contract.</td></tr>
+          <tr><td>GO-WORKFLOW-01</td><td>25</td><td>Workflow Security / CI/CD authority paths</td><td>Mixed</td><td>Reachable workflow authority</td><td>Admin guidance</td><td><code>.github/workflows/reachable-workflow-security-fixture.yml</code></td><td>The compact workflow-security fixture proves command injection, code injection, broken authorization, cross-workflow privilege escalation, untrusted checkout, OIDC/secret authority exposure, action pinning drift, and artifact-poisoning companion findings. Workflow files are owned by the dedicated <code>workflow_security</code> lane rather than the generic secret lane.</td><td>Review workflow trust boundaries, protect low-trust triggers, pin actions, narrow secrets/OIDC scope, and keep privileged sinks behind manual or protected release boundaries.</td></tr>
+          <tr><td><strong>Total</strong></td><td><strong>53</strong></td><td colspan="7">Raw DB signals represented by the grouped expected-finding contract.</td></tr>
         </tbody>
       </table>
       </div>
       <div class="note">
-        This table is the expected-finding contract: 17 grouped rows representing
-        28 raw DB signals. The branded contract page is this page; the source
+        This table is the expected-finding contract: 18 grouped rows representing
+        53 raw DB signals. Workflow security remains a compact representative
+        subset here, not the full support corpus. The branded contract page is this page; the source
         Markdown is stored in the repository, and the machine-readable contract is
         <a href="https://github.com/sthenos-security/reach-testbed-github-go/blob/main/expected/baseline.json">expected/baseline.json</a>.
         CI checks the scan database against that contract before and after

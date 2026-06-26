@@ -923,6 +923,8 @@ def _db_match_keys(row: dict[str, Any]) -> set[tuple[str, str, int]]:
 def _signal_blocks_remediation(row: dict[str, Any]) -> bool:
     if not row:
         return False
+    if str(row.get("signal_type") or "").lower() == "workflow_security":
+        return False
     prod_status = str(row.get("prod_status") or "UNKNOWN").upper()
     if prod_status != "PRODUCTION":
         return False
