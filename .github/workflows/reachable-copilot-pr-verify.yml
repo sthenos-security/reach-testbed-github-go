@@ -16,6 +16,10 @@ on:
         type: string
         default: ""
 
+concurrency:
+  group: reachable-copilot-pr-verify-${{ github.event.inputs.pr_number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 permissions:
   actions: read
   contents: read
@@ -422,11 +426,32 @@ jobs:
           verified_label="reachable-copilot-verified"
           failed_label="reachable-copilot-verification-failed"
           requested_label="reachable-verification-requested"
+
+          add_issue_label() {
+            local pr_number="$1"
+            local label_name="$2"
+            gh api \
+              --method POST \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/issues/${pr_number}/labels" \
+              -f "labels[]=${label_name}" >/dev/null
+          }
+
+          remove_issue_label() {
+            local pr_number="$1"
+            local label_name="$2"
+            gh api \
+              --method DELETE \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/issues/${pr_number}/labels/${label_name}" >/dev/null 2>&1 || true
+          }
+
           gh label create "$verified_label" --repo "$GITHUB_REPOSITORY" --color 2da44e --description "REACHABLE verified this Copilot PR" >/dev/null 2>&1 || true
           gh label create "$failed_label" --repo "$GITHUB_REPOSITORY" --color cf222e --description "REACHABLE could not verify this Copilot PR" >/dev/null 2>&1 || true
           gh label create "$requested_label" --repo "$GITHUB_REPOSITORY" --color 0969da --description "REACHABLE verification was dispatched for this Copilot PR" >/dev/null 2>&1 || true
           if [ ! -f .reachable/ci-artifacts/copilot-verify-pr.json ]; then
-            gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label "$failed_label" || true
+            add_issue_label "$PR_NUMBER" "$failed_label" || true
+            remove_issue_label "$PR_NUMBER" "$requested_label"
             exit 0
           fi
           result="$(python3 - <<'PY'
@@ -446,10 +471,13 @@ jobs:
           PY
           )"
           if [ "$result" = "verified" ]; then
-            gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label "$verified_label" || true
+            add_issue_label "$PR_NUMBER" "$verified_label" || true
+            remove_issue_label "$PR_NUMBER" "$failed_label"
           else
-            gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label "$failed_label" || true
+            add_issue_label "$PR_NUMBER" "$failed_label" || true
+            remove_issue_label "$PR_NUMBER" "$verified_label"
           fi
+          remove_issue_label "$PR_NUMBER" "$requested_label"
 
       - name: Upload Copilot verification artifacts
         if: always()

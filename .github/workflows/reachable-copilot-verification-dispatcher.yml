@@ -14,6 +14,10 @@ on:
   schedule:
     - cron: "*/15 * * * *"
 
+concurrency:
+  group: reachable-copilot-verification-dispatcher-main
+  cancel-in-progress: false
+
 permissions:
   actions: write
   contents: read
@@ -34,6 +38,25 @@ jobs:
       - name: Resolve and dispatch Copilot PR verification
         run: |
           set -euo pipefail
+
+          add_issue_label() {
+            local pr_number="$1"
+            local label_name="$2"
+            gh api \
+              --method POST \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/issues/${pr_number}/labels" \
+              -f "labels[]=${label_name}" >/dev/null
+          }
+
+          remove_issue_label() {
+            local pr_number="$1"
+            local label_name="$2"
+            gh api \
+              --method DELETE \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/issues/${pr_number}/labels/${label_name}" >/dev/null 2>&1 || true
+          }
 
           gh label create "$REQUESTED_LABEL" \
             --repo "$GITHUB_REPOSITORY" \
@@ -196,18 +219,27 @@ jobs:
             fi
 
             echo "Dispatching REACHABLE Copilot verification for PR #${pr_number} using dispatch run ${dispatch_run_id:-<auto-discover>}."
+            add_issue_label "$pr_number" "$REQUESTED_LABEL"
             if [ -n "$dispatch_run_id" ]; then
-              gh workflow run reachable-copilot-pr-verify.yml \
+              if ! gh workflow run reachable-copilot-pr-verify.yml \
                 --repo "$GITHUB_REPOSITORY" \
                 --ref main \
                 -f "pr_number=${pr_number}" \
-                -f "dispatch_run_id=${dispatch_run_id}"
+                -f "dispatch_run_id=${dispatch_run_id}"; then
+                remove_issue_label "$pr_number" "$REQUESTED_LABEL"
+                add_issue_label "$pr_number" "$FAILED_LABEL" || true
+                exit 1
+              fi
             else
-              gh workflow run reachable-copilot-pr-verify.yml \
+              if ! gh workflow run reachable-copilot-pr-verify.yml \
                 --repo "$GITHUB_REPOSITORY" \
                 --ref main \
                 -f "pr_number=${pr_number}" \
-                -f "dispatch_run_id="
+                -f "dispatch_run_id="; then
+                remove_issue_label "$pr_number" "$REQUESTED_LABEL"
+                add_issue_label "$pr_number" "$FAILED_LABEL" || true
+                exit 1
+              fi
             fi
-            gh pr edit "$pr_number" --repo "$GITHUB_REPOSITORY" --add-label "$REQUESTED_LABEL" || true
+            remove_issue_label "$pr_number" "$FAILED_LABEL"
           done < copilot-prs.tsv
