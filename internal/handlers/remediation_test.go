@@ -124,7 +124,7 @@ func TestFetchToolAllowsApprovedHTTPSHost(t *testing.T) {
 }
 
 func TestParseLanguageRejectsUnsupportedTag(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/parse-language?tag=xx-INVALID", nil)
+	req := httptest.NewRequest(http.MethodGet, "/parse-language?tag=xx-INVALID", nil)
 	rec := httptest.NewRecorder()
 
 	ParseLanguage(rec, req)
