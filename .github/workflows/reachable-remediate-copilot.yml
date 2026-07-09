@@ -27,7 +27,20 @@ permissions:
   security-events: write
 
 jobs:
+  validate-dispatch-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require dispatch from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "This public demo workflow must be dispatched from main. Re-run it with ref=main." >&2
+            exit 2
+          fi
+
   reachable-copilot-dispatch:
+    needs: validate-dispatch-ref
     uses: sthenos-security/reach-ci-github/.github/workflows/auto-remediate.yml@v1
     with:
       target_branch: ${{ inputs.target_branch }}
