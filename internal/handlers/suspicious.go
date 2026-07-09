@@ -75,6 +75,8 @@ func validatedToolURL(raw string) (string, error) {
 }
 
 func fetchToolAllowedURLs() map[string]string {
+	// REACH_FETCH_TOOL_ALLOWED_URLS is a comma-separated list of absolute HTTPS URLs.
+	// Requests are allowed only when the incoming URL exactly matches one configured entry.
 	raw := strings.TrimSpace(os.Getenv("REACH_FETCH_TOOL_ALLOWED_URLS"))
 	allowed := make(map[string]string)
 	if raw == "" {

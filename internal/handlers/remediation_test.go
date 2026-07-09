@@ -54,6 +54,21 @@ func TestFetchToolRejectsDisallowedHost(t *testing.T) {
 	}
 }
 
+func TestFetchToolRejectsNonAllowlistedPath(t *testing.T) {
+	t.Setenv("REACH_FETCH_TOOL_ALLOWED_URLS", "https://example.invalid/tool")
+	req := httptest.NewRequest(http.MethodPost, "/admin/fetch-tool?url=https://example.invalid/tool/subpath", nil)
+	rec := httptest.NewRecorder()
+
+	FetchTool(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+	if got := rec.Body.String(); got != "invalid source url\n" {
+		t.Fatalf("expected invalid source response, got %q", got)
+	}
+}
+
 func TestFetchToolFetchFailureReturnsGenericError(t *testing.T) {
 	t.Setenv("REACH_FETCH_TOOL_ALLOWED_URLS", "https://127.0.0.1:1/tool")
 	req := httptest.NewRequest(http.MethodPost, "/admin/fetch-tool?url=https://127.0.0.1:1/tool", nil)
