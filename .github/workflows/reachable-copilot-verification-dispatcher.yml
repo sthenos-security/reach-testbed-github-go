@@ -45,7 +45,7 @@ jobs:
           set -euo pipefail
           dispatch_count=0
           max_dispatches=25
-          current_campaign_max_age_hours=6
+          current_campaign_max_age_hours=24
           if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
             max_dispatches=3
           fi
@@ -132,15 +132,7 @@ jobs:
           payload = json.loads(sys.argv[1])
           max_age_hours = int(sys.argv[2])
           cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
-          allowed = {
-              "Run Demo (Copilot Dispatch)",
-              "Run Demo (Copilot E2E)",
-              "Run Demo (Copilot Alpha Candidate)",
-              "Run Demo (Copilot Bundle Replay)",
-          }
           for item in payload:
-              if item.get("workflowName") not in allowed:
-                  continue
               if item.get("status") != "completed" or item.get("conclusion") != "success":
                   continue
               if item.get("headBranch") != "main":
