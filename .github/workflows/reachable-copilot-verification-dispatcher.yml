@@ -22,7 +22,7 @@ permissions:
   actions: write
   contents: read
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   dispatch-copilot-pr-verification:
@@ -38,6 +38,11 @@ jobs:
       - name: Resolve and dispatch Copilot PR verification
         run: |
           set -euo pipefail
+          dispatch_count=0
+          max_dispatches=25
+          if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
+            max_dispatches=3
+          fi
 
           add_issue_label() {
             local pr_number="$1"
@@ -242,4 +247,9 @@ jobs:
               fi
             fi
             remove_issue_label "$pr_number" "$FAILED_LABEL"
+            dispatch_count=$((dispatch_count + 1))
+            if [ "$dispatch_count" -ge "$max_dispatches" ]; then
+              echo "Reached dispatch limit (${max_dispatches}) for this run."
+              break
+            fi
           done < copilot-prs.tsv
