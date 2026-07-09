@@ -76,13 +76,14 @@ func validatedToolURL(raw string) (string, error) {
 
 func fetchToolAllowedURLs() map[string]string {
 	raw := strings.TrimSpace(os.Getenv("REACH_FETCH_TOOL_ALLOWED_URLS"))
+	allowed := make(map[string]string)
 	if raw == "" {
-		raw = "https://example.invalid/tool"
+		return allowed
 	}
 
-	allowed := make(map[string]string)
 	for _, entry := range strings.Split(raw, ",") {
-		parsed, err := url.Parse(strings.TrimSpace(entry))
+		candidate := strings.TrimSpace(entry)
+		parsed, err := url.Parse(candidate)
 		if err != nil || !parsed.IsAbs() || parsed.Scheme != "https" || parsed.Hostname() == "" {
 			log.Printf("FetchTool: skipping invalid allowlisted URL %q", entry)
 			continue
@@ -93,7 +94,7 @@ func fetchToolAllowedURLs() map[string]string {
 			continue
 		}
 		normalized := normalizeToolURL(parsed)
-		allowed[normalized] = normalized
+		allowed[normalized] = candidate
 	}
 	return allowed
 }
