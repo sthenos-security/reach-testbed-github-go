@@ -5,14 +5,22 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/reachable/reach-testbed-github-go/internal/safety"
+)
+
+var (
+	fetchAllowlistMu     sync.Mutex
+	fetchAllowlistRaw    string
+	fetchAllowlistCached map[string]string
 )
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
@@ -78,33 +86,58 @@ func fetchToolAllowedURLs() map[string]string {
 	// REACH_FETCH_TOOL_ALLOWED_URLS is a comma-separated list of absolute HTTPS URLs.
 	// Requests are allowed only when the incoming URL exactly matches one configured entry.
 	raw := strings.TrimSpace(os.Getenv("REACH_FETCH_TOOL_ALLOWED_URLS"))
-	allowed := make(map[string]string)
-	if raw == "" {
-		return allowed
+	fetchAllowlistMu.Lock()
+	defer fetchAllowlistMu.Unlock()
+	if raw == fetchAllowlistRaw && fetchAllowlistCached != nil {
+		return copyAllowlist(fetchAllowlistCached)
 	}
 
-	for _, entry := range strings.Split(raw, ",") {
-		candidate := strings.TrimSpace(entry)
-		parsed, err := url.Parse(candidate)
-		if err != nil || !parsed.IsAbs() || parsed.Scheme != "https" || parsed.Hostname() == "" {
-			log.Printf("FetchTool: skipping invalid allowlisted URL %q", entry)
-			continue
+	allowed := make(map[string]string)
+	if raw != "" {
+		for _, entry := range strings.Split(raw, ",") {
+			candidate := strings.TrimSpace(entry)
+			parsed, err := url.Parse(candidate)
+			if err != nil || !parsed.IsAbs() || parsed.Scheme != "https" || parsed.Hostname() == "" {
+				log.Printf("FetchTool: skipping invalid allowlisted URL %q", entry)
+				continue
+			}
+			host := strings.ToLower(parsed.Hostname())
+			if !safety.AllowedHostname(host) {
+				log.Printf("FetchTool: skipping allowlisted URL with invalid hostname %q", entry)
+				continue
+			}
+			normalized := normalizeToolURL(parsed)
+			allowed[normalized] = normalized
 		}
-		host := strings.ToLower(parsed.Hostname())
-		if !safety.AllowedHostname(host) {
-			log.Printf("FetchTool: skipping allowlisted URL with invalid hostname %q", entry)
-			continue
-		}
-		normalized := normalizeToolURL(parsed)
-		allowed[normalized] = candidate
 	}
-	return allowed
+
+	fetchAllowlistRaw = raw
+	fetchAllowlistCached = allowed
+	return copyAllowlist(allowed)
 }
 
 func normalizeToolURL(parsed *url.URL) string {
 	normalized := *parsed
+	host := strings.ToLower(normalized.Hostname())
+	port := normalized.Port()
+	switch {
+	case port == "":
+		normalized.Host = host
+	case normalized.Scheme == "https" && port == "443":
+		normalized.Host = host
+	default:
+		normalized.Host = net.JoinHostPort(host, port)
+	}
 	normalized.Fragment = ""
 	return normalized.String()
+}
+
+func copyAllowlist(allowlist map[string]string) map[string]string {
+	cloned := make(map[string]string, len(allowlist))
+	for key, value := range allowlist {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func SuspiciousMarkers(w http.ResponseWriter, _ *http.Request) {
