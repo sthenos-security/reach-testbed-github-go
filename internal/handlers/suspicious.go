@@ -17,16 +17,16 @@ import (
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
-	parsed, err := validatedToolURL(source)
+	safeURL, err := validatedToolURL(source)
 	if err != nil {
 		log.Printf("FetchTool: invalid source URL %q: %v", source, err)
 		http.Error(w, "invalid source url", http.StatusBadRequest)
 		return
 	}
 
-	resp, err := http.Get(parsed.String())
+	resp, err := http.Get(safeURL)
 	if err != nil {
-		log.Printf("FetchTool: failed fetching %q: %v", parsed.String(), err)
+		log.Printf("FetchTool: failed fetching %q: %v", safeURL, err)
 		http.Error(w, "unable to fetch tool", http.StatusBadGateway)
 		return
 	}
@@ -50,45 +50,57 @@ func FetchTool(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(target + "\n"))
 }
 
-func validatedToolURL(raw string) (*url.URL, error) {
+func validatedToolURL(raw string) (string, error) {
 	if strings.TrimSpace(raw) == "" {
-		return nil, errors.New("url is required")
+		return "", errors.New("url is required")
 	}
 
 	parsed, err := url.Parse(raw)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if !parsed.IsAbs() || parsed.Hostname() == "" {
-		return nil, errors.New("absolute URL required")
+		return "", errors.New("absolute URL required")
 	}
 	if parsed.Scheme != "https" {
-		return nil, errors.New("https scheme required")
+		return "", errors.New("https scheme required")
 	}
 
-	host := strings.ToLower(parsed.Hostname())
-	if _, ok := fetchToolAllowedHosts()[host]; !ok {
-		return nil, errors.New("host is not allowed")
+	normalized := normalizeToolURL(parsed)
+	if _, ok := fetchToolAllowedURLs()[normalized]; !ok {
+		return "", errors.New("url is not allowed")
 	}
 
-	return parsed, nil
+	return normalized, nil
 }
 
-func fetchToolAllowedHosts() map[string]struct{} {
-	raw := strings.TrimSpace(os.Getenv("REACH_FETCH_TOOL_ALLOWED_HOSTS"))
+func fetchToolAllowedURLs() map[string]struct{} {
+	raw := strings.TrimSpace(os.Getenv("REACH_FETCH_TOOL_ALLOWED_URLS"))
 	if raw == "" {
-		raw = "example.invalid"
+		raw = "https://example.invalid/tool"
 	}
 
 	allowed := make(map[string]struct{})
 	for _, entry := range strings.Split(raw, ",") {
-		host := strings.ToLower(strings.TrimSpace(entry))
-		if host == "" || !safety.AllowedHostname(host) {
+		parsed, err := url.Parse(strings.TrimSpace(entry))
+		if err != nil || !parsed.IsAbs() || parsed.Scheme != "https" || parsed.Hostname() == "" {
+			log.Printf("FetchTool: skipping invalid allowlisted URL %q", entry)
 			continue
 		}
-		allowed[host] = struct{}{}
+		host := strings.ToLower(parsed.Hostname())
+		if !safety.AllowedHostname(host) {
+			log.Printf("FetchTool: skipping allowlisted URL with invalid hostname %q", entry)
+			continue
+		}
+		allowed[normalizeToolURL(parsed)] = struct{}{}
 	}
 	return allowed
+}
+
+func normalizeToolURL(parsed *url.URL) string {
+	normalized := *parsed
+	normalized.Fragment = ""
+	return normalized.String()
 }
 
 func SuspiciousMarkers(w http.ResponseWriter, _ *http.Request) {

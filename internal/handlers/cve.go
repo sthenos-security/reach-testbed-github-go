@@ -37,7 +37,7 @@ func ParseLanguage(w http.ResponseWriter, r *http.Request) {
 	parsed, err := language.Parse(tag)
 	if err != nil {
 		log.Printf("ParseLanguage: failed parsing tag %q: %v", tag, err)
-		http.Error(w, "invalid language tag", http.StatusBadRequest)
+		http.Error(w, "unsupported language tag", http.StatusBadRequest)
 		return
 	}
 

@@ -25,7 +25,7 @@ func TestSafeAIAnswerInvalidJSONReturnsGenericError(t *testing.T) {
 }
 
 func TestFetchToolRejectsNonHTTPSURL(t *testing.T) {
-	t.Setenv("REACH_FETCH_TOOL_ALLOWED_HOSTS", "example.invalid")
+	t.Setenv("REACH_FETCH_TOOL_ALLOWED_URLS", "https://example.invalid/tool")
 	req := httptest.NewRequest(http.MethodPost, "/admin/fetch-tool?url=http://example.invalid/tool", nil)
 	rec := httptest.NewRecorder()
 
@@ -40,7 +40,7 @@ func TestFetchToolRejectsNonHTTPSURL(t *testing.T) {
 }
 
 func TestFetchToolRejectsDisallowedHost(t *testing.T) {
-	t.Setenv("REACH_FETCH_TOOL_ALLOWED_HOSTS", "example.invalid")
+	t.Setenv("REACH_FETCH_TOOL_ALLOWED_URLS", "https://example.invalid/tool")
 	req := httptest.NewRequest(http.MethodPost, "/admin/fetch-tool?url=https://not-allowed.invalid/tool", nil)
 	rec := httptest.NewRecorder()
 
@@ -55,7 +55,7 @@ func TestFetchToolRejectsDisallowedHost(t *testing.T) {
 }
 
 func TestFetchToolFetchFailureReturnsGenericError(t *testing.T) {
-	t.Setenv("REACH_FETCH_TOOL_ALLOWED_HOSTS", "127.0.0.1")
+	t.Setenv("REACH_FETCH_TOOL_ALLOWED_URLS", "https://127.0.0.1:1/tool")
 	req := httptest.NewRequest(http.MethodPost, "/admin/fetch-tool?url=https://127.0.0.1:1/tool", nil)
 	rec := httptest.NewRecorder()
 
@@ -83,7 +83,7 @@ func TestFetchToolAllowsApprovedHTTPSHost(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("REACH_FETCH_TOOL_ALLOWED_HOSTS", "127.0.0.1")
+	t.Setenv("REACH_FETCH_TOOL_ALLOWED_URLS", server.URL+"/tool")
 	originalTransport := http.DefaultTransport
 	http.DefaultTransport = server.Client().Transport
 	t.Cleanup(func() { http.DefaultTransport = originalTransport })
