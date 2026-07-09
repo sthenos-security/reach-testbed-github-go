@@ -7,6 +7,10 @@ on:
         description: Optional single Copilot PR number to verify
         type: string
         default: ""
+      dispatch_run_id:
+        description: Optional explicit Copilot dispatch run ID for the current campaign
+        type: string
+        default: ""
       force:
         description: Dispatch even if the PR already has a REACHABLE verification label
         type: boolean
@@ -31,6 +35,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       FORCE_DISPATCH: ${{ inputs.force || false }}
       PR_NUMBER: ${{ inputs.pr_number || '' }}
+      DISPATCH_RUN_ID_INPUT: ${{ inputs.dispatch_run_id || '' }}
       REQUESTED_LABEL: reachable-verification-requested
       VERIFIED_LABEL: reachable-copilot-verified
       FAILED_LABEL: reachable-copilot-verification-failed
@@ -40,6 +45,7 @@ jobs:
           set -euo pipefail
           dispatch_count=0
           max_dispatches=25
+          current_campaign_max_age_hours=6
           if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
             max_dispatches=3
           fi
@@ -76,45 +82,186 @@ jobs:
             --color cf222e \
             --description "REACHABLE could not verify this Copilot PR" >/dev/null 2>&1 || true
 
+          resolve_and_download_campaign() {
+            local run_id=""
+            local campaign_dir=""
+            if [ -n "${DISPATCH_RUN_ID_INPUT}" ]; then
+              run_id="${DISPATCH_RUN_ID_INPUT}"
+              campaign_dir="$(mktemp -d)"
+              if gh run download "${run_id}" \
+                --repo "$GITHUB_REPOSITORY" \
+                --name reachable-ci-artifacts \
+                --dir "$campaign_dir" >/dev/null 2>&1; then
+                local db
+                db="$(find "$campaign_dir" -name copilot-tasks.repo.db -type f | head -n 1 || true)"
+                if [ -n "$db" ]; then
+                  printf '%s\t%s\t%s\n' "$run_id" "$campaign_dir" "$db"
+                  return 0
+                fi
+              fi
+              echo "Explicit dispatch_run_id ${run_id} is not usable: reachable-ci-artifacts/copilot-tasks.repo.db not found." >&2
+              return 1
+            fi
+
+            recent_run_ids="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --limit 80 \
+              --json databaseId,workflowName,status,conclusion,headBranch,createdAt)"
+            while IFS= read -r run_id; do
+              [ -n "$run_id" ] || continue
+              campaign_dir="$(mktemp -d)"
+              if ! gh run download "${run_id}" \
+                --repo "$GITHUB_REPOSITORY" \
+                --name reachable-ci-artifacts \
+                --dir "$campaign_dir" >/dev/null 2>&1; then
+                rm -rf "$campaign_dir"
+                continue
+              fi
+              db="$(find "$campaign_dir" -name copilot-tasks.repo.db -type f | head -n 1 || true)"
+              if [ -n "$db" ]; then
+                printf '%s\t%s\t%s\n' "$run_id" "$campaign_dir" "$db"
+                return 0
+              fi
+              rm -rf "$campaign_dir"
+            done < <(
+              python3 - <<'PY' "$recent_run_ids" "$current_campaign_max_age_hours"
+          import json
+          import sys
+          from datetime import datetime, timedelta, timezone
+
+          payload = json.loads(sys.argv[1])
+          max_age_hours = int(sys.argv[2])
+          cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+          allowed = {
+              "Run Demo (Copilot Dispatch)",
+              "Run Demo (Copilot E2E)",
+              "Run Demo (Copilot Alpha Candidate)",
+              "Run Demo (Copilot Bundle Replay)",
+          }
+          for item in payload:
+              if item.get("workflowName") not in allowed:
+                  continue
+              if item.get("status") != "completed" or item.get("conclusion") != "success":
+                  continue
+              if item.get("headBranch") != "main":
+                  continue
+              created_at = item.get("createdAt")
+              if not created_at:
+                  continue
+              created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+              if created < cutoff:
+                  continue
+              print(item["databaseId"])
+          PY
+            )
+            return 1
+          }
+
+          campaign_meta="$(resolve_and_download_campaign || true)"
+          if [ -z "$campaign_meta" ]; then
+            echo "No downloadable Copilot campaign artifact is available. Nothing to verify for the current batch."
+            exit 0
+          fi
+          IFS=$'\t' read -r DISPATCH_RUN_ID campaign_dir campaign_db <<< "$campaign_meta"
+          echo "Using Copilot dispatch run ${DISPATCH_RUN_ID} as the current campaign anchor."
+
           pr_json_path="$(mktemp)"
           if [ -n "${PR_NUMBER}" ]; then
             gh pr view "$PR_NUMBER" \
               --repo "$GITHUB_REPOSITORY" \
-              --json number,author,headRefName,labels,state \
-              --jq '[.]' > "$pr_json_path"
+              --json number,author,headRefName,labels,state,updatedAt > "$pr_json_path"
           else
             gh pr list \
               --repo "$GITHUB_REPOSITORY" \
               --state open \
-              --json number,author,headRefName,labels,state > "$pr_json_path"
+              --json number,author,headRefName,labels,state,updatedAt > "$pr_json_path"
           fi
 
-          python3 - "$pr_json_path" "$REQUESTED_LABEL" "$VERIFIED_LABEL" "$FAILED_LABEL" "$FORCE_DISPATCH" <<'PY' > copilot-prs.tsv
+          python3 - "$campaign_db" "$pr_json_path" "$REQUESTED_LABEL" "$VERIFIED_LABEL" "$FAILED_LABEL" "$FORCE_DISPATCH" "$PR_NUMBER" <<'PY' > copilot-prs.tsv
           import json
+          import sqlite3
           import sys
 
-          path, requested, verified, failed, force_raw = sys.argv[1:]
+          db_path, pr_path, requested, verified, failed, force_raw, single_pr = sys.argv[1:]
           force = str(force_raw).lower() == "true"
-          prs = json.load(open(path, encoding="utf-8"))
+          requested_number = int(single_pr) if single_pr.strip() else None
+          prs_raw = json.load(open(pr_path, encoding="utf-8"))
+          prs = prs_raw if isinstance(prs_raw, list) else [prs_raw]
+
+          conn = sqlite3.connect(db_path)
+          conn.row_factory = sqlite3.Row
+          try:
+              task_rows = list(
+                  conn.execute(
+                      """
+                      SELECT task_id, base_ref, head_ref, state, verification_status, pr_number, pr_url
+                      FROM copilot_tasks
+                      ORDER BY rowid ASC
+                      """
+                  )
+              )
+          finally:
+              conn.close()
+
+          active_suffixes = {}
+          for row in task_rows:
+              task_id = str(row["task_id"] or "").strip()
+              if not task_id:
+                  continue
+              suffix = task_id.removeprefix("rch_task_")
+              active_suffixes[suffix] = {
+                  "task_id": task_id,
+                  "verification_status": str(row["verification_status"] or ""),
+                  "base_ref": str(row["base_ref"] or ""),
+                  "pr_number": row["pr_number"],
+              }
+
+          best_by_suffix = {}
           for pr in prs:
               labels = {item.get("name") for item in pr.get("labels", []) if isinstance(item, dict)}
               number = pr.get("number")
+              if requested_number is not None and number != requested_number:
+                  continue
               author = ((pr.get("author") or {}).get("login") or "")
-              head = pr.get("headRefName") or ""
-              state = pr.get("state") or ""
+              head = str(pr.get("headRefName") or "")
+              state = str(pr.get("state") or "")
+              updated_at = str(pr.get("updatedAt") or "")
               if state and state.upper() != "OPEN":
                   continue
               if author != "app/copilot-swe-agent":
                   continue
               if not head.startswith("copilot/rch-task-"):
                   continue
+              matched_suffix = None
+              for suffix in active_suffixes:
+                  if head.startswith(f"copilot/rch-task-{suffix}"):
+                      matched_suffix = suffix
+                      break
+              if matched_suffix is None:
+                  continue
+              task = active_suffixes[matched_suffix]
+              if str(task.get("verification_status") or "") == "verified" and not force:
+                  continue
               if not force and (requested in labels or verified in labels or failed in labels):
                   continue
-              print(f"{number}\t{head}")
+              current = best_by_suffix.get(matched_suffix)
+              candidate = {
+                  "number": number,
+                  "head": head,
+                  "suffix": matched_suffix,
+                  "task_id": task["task_id"],
+                  "base_ref": task["base_ref"],
+                  "updated_at": updated_at,
+              }
+              if current is None or candidate["updated_at"] > current["updated_at"]:
+                  best_by_suffix[matched_suffix] = candidate
+
+          for suffix, item in best_by_suffix.items():
+              print(f"{item['number']}\t{item['head']}\t{item['suffix']}\t{item['task_id']}\t{item['base_ref']}")
           PY
 
           if [ ! -s copilot-prs.tsv ]; then
-            echo "No Copilot PRs need REACHABLE verification dispatch."
+            echo "No Copilot PRs from the current campaign need REACHABLE verification dispatch."
             exit 0
           fi
 
@@ -173,78 +320,22 @@ jobs:
             return 1
           }
 
-          while IFS=$'\t' read -r pr_number head_ref; do
+          while IFS=$'\t' read -r pr_number head_ref task_suffix task_id base_ref; do
             [ -n "$pr_number" ] || continue
             if [ "${FORCE_DISPATCH}" != "true" ] && already_verified "$pr_number"; then
               continue
             fi
-            task_suffix="$(python3 - "$head_ref" <<'PY'
-          import re
-          import sys
-          match = re.search(r"rch-task-([0-9a-f]+)", sys.argv[1])
-          print(match.group(1) if match else "")
-          PY
-          )"
-            dispatch_run_id=""
-            if [ -n "$task_suffix" ]; then
-              while IFS= read -r run_id; do
-                [ -n "$run_id" ] || continue
-                rm -rf dispatch-artifacts
-                mkdir -p dispatch-artifacts
-                if ! gh run download "$run_id" \
-                  --repo "$GITHUB_REPOSITORY" \
-                  --name reachable-ci-artifacts \
-                  --dir dispatch-artifacts >/dev/null 2>&1; then
-                  continue
-                fi
-                dispatch_json="$(find dispatch-artifacts -name copilot-dispatch.json -type f | head -n 1 || true)"
-                if [ -z "$dispatch_json" ]; then
-                  continue
-                fi
-                if python3 - "$dispatch_json" "$task_suffix" <<'PY'
-          import json
-          import sys
-          payload = json.load(open(sys.argv[1], encoding="utf-8"))
-          suffix = sys.argv[2]
-          if any(str(task.get("task_id") or "").endswith(suffix) for task in payload.get("tasks") or []):
-              raise SystemExit(0)
-          raise SystemExit(1)
-          PY
-                then
-                  dispatch_run_id="$run_id"
-                  break
-                fi
-              done < <(
-                gh run list \
-                  --repo "$GITHUB_REPOSITORY" \
-                  --limit 80 \
-                  --json databaseId,workflowName \
-                  --jq '.[] | select(.workflowName == "Run Demo (Copilot Dispatch)" or .workflowName == "Run Demo (Copilot Bundle Replay)" or .workflowName == "Run Demo (Copilot Alpha Candidate)") | .databaseId'
-              )
-            fi
-
-            echo "Dispatching REACHABLE Copilot verification for PR #${pr_number} using dispatch run ${dispatch_run_id:-<auto-discover>}."
+            dispatch_run_id="${DISPATCH_RUN_ID}"
+            echo "Dispatching REACHABLE Copilot verification for PR #${pr_number} from campaign task ${task_id} on base ${base_ref:-main} using dispatch run ${dispatch_run_id}."
             add_issue_label "$pr_number" "$REQUESTED_LABEL"
-            if [ -n "$dispatch_run_id" ]; then
-              if ! gh workflow run reachable-copilot-pr-verify.yml \
-                --repo "$GITHUB_REPOSITORY" \
-                --ref main \
-                -f "pr_number=${pr_number}" \
-                -f "dispatch_run_id=${dispatch_run_id}"; then
-                remove_issue_label "$pr_number" "$REQUESTED_LABEL"
-                add_issue_label "$pr_number" "$FAILED_LABEL" || true
-                exit 1
-              fi
-            else
-              if ! gh workflow run reachable-copilot-pr-verify.yml \
-                --repo "$GITHUB_REPOSITORY" \
-                --ref main \
-                -f "pr_number=${pr_number}" \
-                -f "dispatch_run_id="; then
-                remove_issue_label "$pr_number" "$REQUESTED_LABEL"
-                add_issue_label "$pr_number" "$FAILED_LABEL" || true
-                exit 1
-              fi
+            if ! gh workflow run reachable-copilot-pr-verify.yml \
+              --repo "$GITHUB_REPOSITORY" \
+              --ref main \
+              -f "pr_number=${pr_number}" \
+              -f "dispatch_run_id=${dispatch_run_id}"; then
+              remove_issue_label "$pr_number" "$REQUESTED_LABEL"
+              add_issue_label "$pr_number" "$FAILED_LABEL" || true
+              exit 1
             fi
             remove_issue_label "$pr_number" "$FAILED_LABEL"
             dispatch_count=$((dispatch_count + 1))

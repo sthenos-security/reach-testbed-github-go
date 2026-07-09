@@ -1,10 +1,6 @@
 name: "Verify Copilot PR"
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       pr_number:
@@ -29,7 +25,6 @@ permissions:
 
 jobs:
   verify-copilot-pr:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login == 'app/copilot-swe-agent' }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -38,11 +33,7 @@ jobs:
       - name: Resolve Copilot PR metadata
         run: |
           set -euo pipefail
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            pr_number="${{ github.event.pull_request.number }}"
-          else
-            pr_number="${{ github.event.inputs.pr_number }}"
-          fi
+          pr_number="${{ github.event.inputs.pr_number }}"
           if [ -z "$pr_number" ]; then
             echo "pr_number is required." >&2
             exit 2
