@@ -4,16 +4,38 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/reachable/reach-testbed-github-go/internal/safety"
 )
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
+	if source == "" {
+		http.Error(w, "url parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	parsed, err := url.Parse(source)
+	if err != nil {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+	if parsed.Scheme != "https" {
+		http.Error(w, "invalid url: https scheme required", http.StatusBadRequest)
+		return
+	}
+	if !safety.AllowedHostname(parsed.Hostname()) {
+		http.Error(w, "disallowed host", http.StatusBadRequest)
+		return
+	}
+
 	resp, err := http.Get(source)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		http.Error(w, "request failed", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
@@ -21,13 +43,13 @@ func FetchTool(w http.ResponseWriter, r *http.Request) {
 	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
 	out, err := os.Create(target)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer out.Close()
 
 	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
