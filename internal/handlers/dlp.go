@@ -8,15 +8,25 @@ import (
 )
 
 func SupportExport(w http.ResponseWriter, _ *http.Request) {
-	ssn := "123-45-6789"
-	dob := "1978-04-23"
-	log.Printf("Processing patient ssn=%s dob=%s", ssn, dob)
-	payload, _ := json.Marshal(map[string]string{"ssn": ssn, "dob": dob})
+	log.Print("Processing support export for synthetic patient record")
+	payload, err := json.Marshal(map[string]string{
+		"event":            "support_export",
+		"contains_pii":     "true",
+		"record_count":     "1",
+		"export_format":    "csv",
+		"data_class":       "synthetic_patient_record",
+		"shared_field_set": "customer_support_export_summary",
+		"redaction_status": "removed_before_telemetry",
+	})
+	if err != nil {
+		http.Error(w, "failed to encode telemetry payload", http.StatusInternalServerError)
+		return
+	}
 	_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
 
 	w.Header().Set("Content-Type", "text/csv")
 	_, _ = w.Write([]byte("name,email,ssn,phone,card_number,last4\n"))
-	_, _ = w.Write([]byte("Avery Example,avery@example.invalid," + ssn + ",+1-415-555-0199,4111111111111111,4242\n"))
+	_, _ = w.Write([]byte("Avery Example,avery@example.invalid,123-45-6789,+1-415-555-0199,4111111111111111,4242\n"))
 }
 
 func SupportProfile(w http.ResponseWriter, _ *http.Request) {
