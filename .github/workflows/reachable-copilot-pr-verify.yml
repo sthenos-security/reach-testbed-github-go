@@ -100,8 +100,8 @@ jobs:
           if [ -n "${DISPATCH_RUN_ID:-}" ]; then
             printf '%s\n' "$DISPATCH_RUN_ID" > dispatch-runs.txt
           else
-            gh run list --repo "$GITHUB_REPOSITORY" --limit 200 --json databaseId,status,conclusion,headBranch,createdAt \
-              --jq '.[] | select(.status == "completed" and .conclusion == "success" and .headBranch == "main") | .databaseId' \
+            gh run list --repo "$GITHUB_REPOSITORY" --limit 200 --json databaseId,workflowName \
+              --jq '.[] | select(.workflowName == "Run Demo (Copilot Dispatch)" or .workflowName == "Run Demo (Copilot E2E)" or .workflowName == "Run Demo (Copilot Alpha Candidate)" or .workflowName == "Run Demo (Copilot Bundle Replay)") | .databaseId' \
               > dispatch-runs.txt
           fi
 

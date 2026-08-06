@@ -15,8 +15,20 @@ on:
         description: Dispatch even if the PR already has a REACHABLE verification label
         type: boolean
         default: false
-  schedule:
-    - cron: "*/15 * * * *"
+  # Event-driven, not polled: fires when a Copilot campaign workflow actually
+  # completes, instead of an unconditional schedule that ran every 15
+  # minutes around the clock regardless of whether any remediation was in
+  # progress. All four are workflow_dispatch-only (a campaign is always a
+  # deliberate, manual dispatch, never automatic), so this is the exact
+  # moment a campaign becomes available to verify.
+  workflow_run:
+    workflows:
+      - "Run Demo (Copilot Dispatch)"
+      - "Run Demo (Copilot E2E)"
+      - "Run Demo (Copilot Alpha Candidate)"
+      - "Run Demo (Copilot Bundle Replay)"
+    types:
+      - completed
 
 concurrency:
   group: reachable-copilot-verification-dispatcher-main
@@ -30,6 +42,9 @@ permissions:
 
 jobs:
   dispatch-copilot-pr-verification:
+    # Only act on a workflow_run event when the campaign it names actually
+    # succeeded; workflow_dispatch (manual/explicit) always proceeds.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -45,8 +60,8 @@ jobs:
           set -euo pipefail
           dispatch_count=0
           max_dispatches=25
-          current_campaign_max_age_hours=24
-          if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
+          current_campaign_max_age_hours=6
+          if [ "${GITHUB_EVENT_NAME}" = "schedule" ] || [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
             max_dispatches=3
           fi
 
@@ -132,7 +147,15 @@ jobs:
           payload = json.loads(sys.argv[1])
           max_age_hours = int(sys.argv[2])
           cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+          allowed = {
+              "Run Demo (Copilot Dispatch)",
+              "Run Demo (Copilot E2E)",
+              "Run Demo (Copilot Alpha Candidate)",
+              "Run Demo (Copilot Bundle Replay)",
+          }
           for item in payload:
+              if item.get("workflowName") not in allowed:
+                  continue
               if item.get("status") != "completed" or item.get("conclusion") != "success":
                   continue
               if item.get("headBranch") != "main":
