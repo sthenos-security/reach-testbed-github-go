@@ -2,18 +2,40 @@ package handlers
 
 import (
 	"encoding/base64"
+	"errors"
 	"io"
+	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"sync"
+
+	"github.com/reachable/reach-testbed-github-go/internal/safety"
+)
+
+var (
+	fetchAllowlistMu     sync.Mutex
+	fetchAllowlistRaw    string
+	fetchAllowlistCached map[string]string
 )
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
-	resp, err := http.Get(source)
+	safeURL, err := validatedToolURL(source)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		log.Printf("FetchTool: invalid source URL %q: %v", source, err)
+		http.Error(w, "invalid source url", http.StatusBadRequest)
+		return
+	}
+
+	resp, err := http.Get(safeURL)
+	if err != nil {
+		log.Printf("FetchTool: failed fetching %q: %v", safeURL, err)
+		http.Error(w, "unable to fetch tool", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
@@ -21,17 +43,101 @@ func FetchTool(w http.ResponseWriter, r *http.Request) {
 	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
 	out, err := os.Create(target)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("FetchTool: failed creating target %q: %v", target, err)
+		http.Error(w, "unable to prepare tool storage", http.StatusInternalServerError)
 		return
 	}
 	defer out.Close()
 
 	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("FetchTool: failed writing target %q: %v", target, err)
+		http.Error(w, "unable to store tool", http.StatusInternalServerError)
 		return
 	}
 
 	_, _ = w.Write([]byte(target + "\n"))
+}
+
+func validatedToolURL(raw string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", errors.New("url is required")
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	if !parsed.IsAbs() || parsed.Hostname() == "" {
+		return "", errors.New("absolute URL required")
+	}
+	if parsed.Scheme != "https" {
+		return "", errors.New("https scheme required")
+	}
+
+	normalized := normalizeToolURL(parsed)
+	allowedURLs := fetchToolAllowedURLs()
+	if allowedURL, ok := allowedURLs[normalized]; ok {
+		return allowedURL, nil
+	}
+	return "", errors.New("url is not allowed")
+}
+
+func fetchToolAllowedURLs() map[string]string {
+	// REACH_FETCH_TOOL_ALLOWED_URLS is a comma-separated list of absolute HTTPS URLs.
+	// Requests are allowed only when the incoming URL exactly matches one configured entry.
+	raw := strings.TrimSpace(os.Getenv("REACH_FETCH_TOOL_ALLOWED_URLS"))
+	fetchAllowlistMu.Lock()
+	defer fetchAllowlistMu.Unlock()
+	if raw == fetchAllowlistRaw && fetchAllowlistCached != nil {
+		return copyAllowlist(fetchAllowlistCached)
+	}
+
+	allowed := make(map[string]string)
+	if raw != "" {
+		for _, entry := range strings.Split(raw, ",") {
+			candidate := strings.TrimSpace(entry)
+			parsed, err := url.Parse(candidate)
+			if err != nil || !parsed.IsAbs() || parsed.Scheme != "https" || parsed.Hostname() == "" {
+				log.Printf("FetchTool: skipping invalid allowlisted URL %q", entry)
+				continue
+			}
+			host := strings.ToLower(parsed.Hostname())
+			if !safety.AllowedHostname(host) {
+				log.Printf("FetchTool: skipping allowlisted URL with invalid hostname %q", entry)
+				continue
+			}
+			normalized := normalizeToolURL(parsed)
+			allowed[normalized] = normalized
+		}
+	}
+
+	fetchAllowlistRaw = raw
+	fetchAllowlistCached = allowed
+	return copyAllowlist(allowed)
+}
+
+func normalizeToolURL(parsed *url.URL) string {
+	normalized := *parsed
+	host := strings.ToLower(normalized.Hostname())
+	port := normalized.Port()
+	switch {
+	case port == "":
+		normalized.Host = host
+	case normalized.Scheme == "https" && port == "443":
+		normalized.Host = host
+	default:
+		normalized.Host = net.JoinHostPort(host, port)
+	}
+	normalized.Fragment = ""
+	return normalized.String()
+}
+
+func copyAllowlist(allowlist map[string]string) map[string]string {
+	cloned := make(map[string]string, len(allowlist))
+	for key, value := range allowlist {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func SuspiciousMarkers(w http.ResponseWriter, _ *http.Request) {
