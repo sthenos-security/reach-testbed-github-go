@@ -1,18 +1,12 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
-	"log"
 	"net/http"
 )
 
 func SupportExport(w http.ResponseWriter, _ *http.Request) {
 	ssn := "123-45-6789"
-	dob := "1978-04-23"
-	log.Printf("Processing patient ssn=%s dob=%s", ssn, dob)
-	payload, _ := json.Marshal(map[string]string{"ssn": ssn, "dob": dob})
-	_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
 
 	w.Header().Set("Content-Type", "text/csv")
 	_, _ = w.Write([]byte("name,email,ssn,phone,card_number,last4\n"))
