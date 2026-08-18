@@ -11,8 +11,24 @@ func SupportExport(w http.ResponseWriter, _ *http.Request) {
 	ssn := "123-45-6789"
 	dob := "1978-04-23"
 	log.Printf("Processing patient ssn=%s dob=%s", ssn, dob)
-	payload, _ := json.Marshal(map[string]string{"ssn": ssn, "dob": dob})
-	_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
+	payload, err := json.Marshal(map[string]interface{}{"event": "support_export_generated", "contains_pii": true})
+	if err != nil {
+		log.Printf("failed to marshal analytics payload: %v", err)
+	} else {
+		resp, postErr := http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
+		if postErr != nil {
+			log.Printf("failed to send analytics payload: %v", postErr)
+			if resp != nil && resp.Body != nil {
+				if closeErr := resp.Body.Close(); closeErr != nil {
+					log.Printf("failed to close analytics response body: %v", closeErr)
+				}
+			}
+		} else if resp != nil && resp.Body != nil {
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				log.Printf("failed to close analytics response body: %v", closeErr)
+			}
+		}
+	}
 
 	w.Header().Set("Content-Type", "text/csv")
 	_, _ = w.Write([]byte("name,email,ssn,phone,card_number,last4\n"))
