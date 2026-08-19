@@ -335,7 +335,7 @@ jobs:
             return 1
           }
 
-          while IFS=$'\t' read -r pr_number head_ref task_suffix task_id base_ref; do
+          while IFS=$'\t' read -r pr_number _head_ref _task_suffix task_id base_ref; do
             [ -n "$pr_number" ] || continue
             if [ "${FORCE_DISPATCH}" != "true" ] && already_verified "$pr_number"; then
               continue

@@ -34,10 +34,6 @@ jobs:
     env:
       CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
       CANDIDATE_ARTIFACT_NAME: ${{ inputs.candidate_artifact_name }}
-      REACHABLE_COPILOT_USER_TOKEN: ${{ secrets.REACHABLE_COPILOT_USER_TOKEN }}
-      MCP_GITHUB_TOKEN: ${{ secrets.MCP_GITHUB_TOKEN }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - name: Checkout target branch
         uses: actions/checkout@v5
@@ -46,6 +42,8 @@ jobs:
           fetch-depth: 1
 
       - name: Validate required inputs and secrets
+        env:
+          REACHABLE_COPILOT_USER_TOKEN: ${{ secrets.REACHABLE_COPILOT_USER_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "${CANDIDATE_RUN_ID}" ]; then
@@ -92,6 +90,10 @@ jobs:
           reachctl doctor --ci
 
       - name: Baseline scan
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MCP_GITHUB_TOKEN: ${{ secrets.MCP_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p .reachable/ci-artifacts
@@ -102,6 +104,9 @@ jobs:
             --sarif .reachable/ci-artifacts/reachable.sarif
 
       - name: Dispatch Copilot remediation task
+        env:
+          REACHABLE_COPILOT_USER_TOKEN: ${{ secrets.REACHABLE_COPILOT_USER_TOKEN }}
+          MCP_GITHUB_TOKEN: ${{ secrets.MCP_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p .reachable/ci-artifacts
