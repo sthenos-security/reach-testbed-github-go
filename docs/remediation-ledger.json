@@ -262,7 +262,7 @@
       "remediate": "true",
       "remediation_mode": "codex-openai",
       "rescan_only": "false",
-      "rescan_strategy": "final",
+      "rescan_strategy": "final_only",
       "scan_extra_flags": "",
       "signal_types": "all"
     },

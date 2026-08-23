@@ -111,6 +111,13 @@ keeps the pushed remediation branch and publishes the manual PR URL/path instead
 of hiding the auth failure in a green log. Branch protection and review policy
 still decide whether anything can merge.
 
+This demo follows the same CI agent trust model as the Marketplace action and
+`reach-ci-github`: synchronous Codex/Claude jobs and hosted Copilot tasks are
+allowed to create remediation branches or PRs for review, but branch protection,
+trusted workflow execution, masked provider keys, and human review remain the
+security boundary. Do not run the code-changing demo workflows from untrusted
+forks or workflows that can expose CI secrets.
+
 `MCP_GITHUB_TOKEN` is the optional read-only source token for higher-quality
 GitHub package context. Create it as a fine-grained PAT at
 <https://github.com/settings/personal-access-tokens/new>, choose the GitHub
@@ -363,7 +370,7 @@ publishes fresh evidence.
 | `signal_types` | `all` | Limits remediation to selected signal families, or leaves all families eligible. |
 | `max_batches` | `1` | Bounds the public demo to one serialized remediation batch so the run stays short and auditable. |
 | `rescan_strategy` | `each_batch` | Runs proof scans after each batch so the workflow can stop as soon as the branch is clean. |
-| `scan_extra_flags` | empty | Optional extra scan flags for advanced test runs. |
+| `scan_extra_flags` | empty | Trusted maintainer-controlled extra scan flags for advanced test runs. |
 | `require_ai` | `true` | Fails early unless the selected provider key is configured. |
 | `fresh_scan` | `true` | Starts from an empty `~/.reachable` cache for a clean evidence run. |
 | `create_pr` | `true` | Opens a remediation pull request when code changes are successfully produced. |
