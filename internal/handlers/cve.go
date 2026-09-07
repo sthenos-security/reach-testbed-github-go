@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/reachable/reach-testbed-github-go/internal/safety"
@@ -35,7 +36,8 @@ func ParseLanguage(w http.ResponseWriter, r *http.Request) {
 
 	parsed, err := language.Parse(tag)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Printf("language parse failed for tag %q: %v", tag, err)
+		http.Error(w, "invalid language tag", http.StatusBadRequest)
 		return
 	}
 
