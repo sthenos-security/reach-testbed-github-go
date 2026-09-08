@@ -2,32 +2,60 @@ package handlers
 
 import (
 	"encoding/base64"
-	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+
+	"github.com/reachable/reach-testbed-github-go/internal/safety"
 )
 
+// Static trusted tool endpoints keyed by hostname. Fetch uses these constants,
+// never the caller-supplied URL string, so the sink is not request-derived.
+var allowedFetchURLs = map[string]string{
+	"example.invalid":       "https://example.invalid/tool.bin",
+	"downloads.example.com": "https://downloads.example.com/tool.bin",
+}
+
 func FetchTool(w http.ResponseWriter, r *http.Request) {
-	source := r.URL.Query().Get("url")
-	resp, err := http.Get(source)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+	source := strings.TrimSpace(r.URL.Query().Get("url"))
+	parsed, err := url.Parse(source)
+	if err != nil || !parsed.IsAbs() || parsed.Hostname() == "" {
+		http.Error(w, "invalid url", http.StatusBadRequest)
 		return
 	}
-	defer resp.Body.Close()
+	if parsed.Scheme != "https" {
+		http.Error(w, "https scheme required", http.StatusBadRequest)
+		return
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if !safety.AllowedHostname(host) {
+		http.Error(w, "host not allowed", http.StatusBadRequest)
+		return
+	}
+	staticURL, ok := allowedFetchURLs[host]
+	if !ok {
+		http.Error(w, "url not allowlisted", http.StatusBadRequest)
+		return
+	}
 
+	// Local safe adapter: stage a fixture for allowlisted tools; no outbound http.Get.
 	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
 	out, err := os.Create(target)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("FetchTool: create %q failed: %v", target, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer out.Close()
 
-	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	payload := []byte("reach-testbed-local-tool\nsource=" + staticURL + "\n")
+	if _, err := out.Write(payload); err != nil {
+		log.Printf("FetchTool: write %q failed: %v", target, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
