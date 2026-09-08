@@ -62,3 +62,48 @@ func TestAIAnswerLocalPromptNoOutbound(t *testing.T) {
 		t.Fatalf("legitimate question: raw interpolation path still present: %q", got["prompt"])
 	}
 }
+
+func TestAIAgentPlanRejectsUnsupportedTool(t *testing.T) {
+	prev := http.DefaultTransport
+	http.DefaultTransport = failRoundTripper{t: t}
+	t.Cleanup(func() { http.DefaultTransport = prev })
+
+	body := `{"task":"collect inventory","tool":"shell"}`
+	req := httptest.NewRequest(http.MethodPost, "/ai/agent-plan", io.LimitReader(strings.NewReader(body), 1<<20))
+	rec := httptest.NewRecorder()
+
+	AIAgentPlan(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("unsupported tool: got status %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestAIAgentPlanLocalPlanNoOutbound(t *testing.T) {
+	prev := http.DefaultTransport
+	http.DefaultTransport = failRoundTripper{t: t}
+	t.Cleanup(func() { http.DefaultTransport = prev })
+
+	body := `{"task":"summarize open tickets","tool":"summarize"}`
+	req := httptest.NewRequest(http.MethodPost, "/ai/agent-plan", io.LimitReader(strings.NewReader(body), 1<<20))
+	rec := httptest.NewRecorder()
+
+	AIAgentPlan(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("legitimate plan: got status %d, want %d", rec.Code, http.StatusOK)
+	}
+	var got map[string]string
+	if err := json.NewDecoder(io.LimitReader(rec.Body, 1<<20)).Decode(&got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got["system_prompt"] == "" || got["tool_spec"] == "" {
+		t.Fatalf("legitimate plan: missing response fields: %#v", got)
+	}
+	if !strings.Contains(got["tool_spec"], "summarize open tickets") {
+		t.Fatalf("legitimate plan: tool_spec missing quoted task: %q", got["tool_spec"])
+	}
+	if strings.Contains(got["tool_spec"], "shell(command)") {
+		t.Fatalf("legitimate plan: shell tool authority still present: %q", got["tool_spec"])
+	}
+}
