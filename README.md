@@ -88,9 +88,9 @@ when the DB proof is clean, open a PR, and publish the verdict page.
 | `rescan_only` | `false` | Run the full release-gate loop: scan baseline, patch branch, rescan proof, publish evidence. |
 | `target_branch` | `main` | The branch being evaluated as the release candidate. |
 | `ai_mode` | workflow-specific | `Run Demo (Codex)` uses `openai-codex` with `OPENAI_API_KEY`. `Run Demo (Claude)` uses `anthropic-claude` with `ANTHROPIC_API_KEY`. `Run Demo (Copilot Dispatch)` uses `copilot-github` with `REACHABLE_COPILOT_USER_TOKEN`. |
-| `prompt_profile` | `balanced` | Keeps fixes scoped: enough context to repair the issue queue without turning the run into an open-ended refactor. |
+| `prompt_profile` | `balanced` | Ledger/metadata only; CI does not pin remediae `--profile`. |
 | `signal_types` | `all` | Covers all demo blocker classes: CVE, CWE, secret, DLP, and AI findings. |
-| `max_batches` | `1` | Upper bound for serialized fix batches in this smoke-style public demo. The workflow stops after one bounded pass and proves the result from the database. |
+| `max_batches` | `1` | Path-B adapter handoff bound (not reachctl iteration math). Smoke demos use 1. |
 | `rescan_strategy` | `each_batch` | Rescan after each bounded patch batch so CI can stop once release blockers are gone. |
 | `require_ai` | `true` | Fail fast if the selected AI key is missing, instead of producing a confusing partial run. |
 | `fresh_scan` | `true` | Start from an empty Reachable cache for a clean public demo evidence run. |
@@ -366,9 +366,9 @@ publishes fresh evidence.
 | `rescan_only` | `false` | Verifies `target_branch` as an existing branch; does not invoke an agent or create edits. |
 | `target_branch` | `main` | Baseline branch for normal runs, or the branch to verify when `rescan_only=true`. |
 | `ai_mode` | `openai-codex` | Selects the agent lane and matching provider secret. |
-| `prompt_profile` | `balanced` | Controls how aggressively Reachable bundles remediation work. |
+| `prompt_profile` | `balanced` | Ledger/metadata only; CI does not pin remediae `--profile`. |
 | `signal_types` | `all` | Limits remediation to selected signal families, or leaves all families eligible. |
-| `max_batches` | `1` | Bounds the public demo to one serialized remediation batch so the run stays short and auditable. |
+| `max_batches` | `1` | Path-B adapter handoff bound for a short smoke run; not remediae `--max-iterations`. |
 | `rescan_strategy` | `each_batch` | Runs proof scans after each batch so the workflow can stop as soon as the branch is clean. |
 | `scan_extra_flags` | empty | Trusted maintainer-controlled extra scan flags for advanced test runs. |
 | `require_ai` | `true` | Fails early unless the selected provider key is configured. |

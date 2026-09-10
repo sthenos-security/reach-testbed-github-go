@@ -49,7 +49,6 @@ jobs:
       scan_mode: ${{ inputs.scan_mode }}
       create_pr: false
       ai_mode: "copilot-github"
-      prompt_profile: "balanced"
       signal_types: "all"
       max_batches: 1
       rescan_strategy: "each_batch"
