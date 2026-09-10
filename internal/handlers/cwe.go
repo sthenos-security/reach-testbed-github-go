@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"os/exec"
 
@@ -9,9 +10,16 @@ import (
 
 func DiagnosticPing(w http.ResponseWriter, r *http.Request) {
 	host := r.URL.Query().Get("host")
-	out, err := exec.Command("sh", "-c", "ping -c 1 "+host).CombinedOutput()
+	if !safety.AllowedHostname(host) {
+		http.Error(w, "invalid host", http.StatusBadRequest)
+		return
+	}
+
+	// Validated host only; fixed argv (no shell). Generic client error on failure.
+	out, err := exec.Command("ping", "-c", "1", host).CombinedOutput()
 	if err != nil {
-		http.Error(w, string(out), http.StatusBadGateway)
+		log.Printf("DiagnosticPing: ping %q failed: %v output=%q", host, err, out)
+		http.Error(w, "ping failed", http.StatusBadGateway)
 		return
 	}
 
