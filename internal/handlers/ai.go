@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -58,7 +59,8 @@ func AIAgentPlan(w http.ResponseWriter, r *http.Request) {
 func SafeAIAnswer(w http.ResponseWriter, r *http.Request) {
 	var req promptRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Printf("SafeAIAnswer: invalid request body: %v", err)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	if strings.Contains(strings.ToLower(req.Question), "ignore previous") {
