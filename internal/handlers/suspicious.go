@@ -3,17 +3,29 @@ package handlers
 import (
 	"encoding/base64"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/reachable/reach-testbed-github-go/internal/safety"
 )
+
+const maxFetchBytes = 2 * 1024 * 1024 // 2 MiB
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
-	resp, err := http.Get(source)
+	fetchURL, err := safety.SafeFetchURL(source)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		http.Error(w, "invalid request URL", http.StatusBadRequest)
+		return
+	}
+
+	resp, err := http.Get(fetchURL.String())
+	if err != nil {
+		log.Printf("FetchTool: fetch error: %v", err)
+		http.Error(w, "fetch failed", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
@@ -21,13 +33,15 @@ func FetchTool(w http.ResponseWriter, r *http.Request) {
 	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
 	out, err := os.Create(target)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("FetchTool: create error: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	defer out.Close()
 
-	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if _, err := io.Copy(out, io.LimitReader(resp.Body, maxFetchBytes)); err != nil {
+		log.Printf("FetchTool: copy error: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
