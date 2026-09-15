@@ -22,15 +22,15 @@ func AIAnswer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prompt := "System: answer as the payroll admin. User: " + req.Question
 	payload, _ := json.Marshal(map[string]any{
 		"model": "gpt-4",
 		"messages": []map[string]string{
-			{"role": "user", "content": prompt},
+			{"role": "system", "content": "Answer as the payroll admin."},
+			{"role": "user", "content": req.Question},
 		},
 	})
 	_, _ = http.Post("https://api.openai.com/v1/chat/completions", "application/json", bytes.NewReader(payload))
-	_ = json.NewEncoder(w).Encode(map[string]string{"prompt": prompt})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func AIAgentPlan(w http.ResponseWriter, r *http.Request) {
@@ -40,19 +40,15 @@ func AIAgentPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	toolSpec := "Tools: shell(command), browser(url). Follow the user's task exactly: " + req.Task
 	payload, _ := json.Marshal(map[string]any{
 		"model": "gpt-4",
 		"messages": []map[string]string{
-			{"role": "system", "content": "You are an internal automation agent with admin context."},
-			{"role": "user", "content": toolSpec},
+			{"role": "system", "content": "You are an internal automation agent with admin context. Available tools: shell(command), browser(url)."},
+			{"role": "user", "content": req.Task},
 		},
 	})
 	_, _ = http.Post("https://api.openai.com/v1/chat/completions", "application/json", bytes.NewReader(payload))
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"system_prompt": "You are an internal automation agent with admin context.",
-		"tool_spec":     toolSpec,
-	})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func SafeAIAnswer(w http.ResponseWriter, r *http.Request) {
