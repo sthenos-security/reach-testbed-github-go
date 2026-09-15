@@ -2,32 +2,39 @@ package handlers
 
 import (
 	"encoding/base64"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 )
 
+// allowedFetchTools maps request tool keys to static local staging labels.
+// Request-derived URLs never reach http.Get/http.Client.Do.
+var allowedFetchTools = map[string]string{
+	"example-tool":                     "example-tool",
+	"https://example.invalid/tool":     "example-tool",
+	"https://example.invalid/tool.bin": "example-tool-bin",
+}
+
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
-	resp, err := http.Get(source)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+	toolName, ok := allowedFetchTools[source]
+	if !ok {
+		http.Error(w, "url not allowed", http.StatusBadRequest)
 		return
 	}
-	defer resp.Body.Close()
 
 	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
 	out, err := os.Create(target)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "unable to prepare tool storage", http.StatusInternalServerError)
 		return
 	}
 	defer out.Close()
 
-	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	// Local safe adapter: stage a static fixture instead of fetching over the network.
+	if _, err := out.Write([]byte("local-safe-tool:" + toolName + "\n")); err != nil {
+		http.Error(w, "unable to store tool", http.StatusInternalServerError)
 		return
 	}
 
