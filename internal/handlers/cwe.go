@@ -9,13 +9,13 @@ import (
 
 func DiagnosticPing(w http.ResponseWriter, r *http.Request) {
 	host := r.URL.Query().Get("host")
-	out, err := exec.Command("sh", "-c", "ping -c 1 "+host).CombinedOutput()
-	if err != nil {
-		http.Error(w, string(out), http.StatusBadGateway)
+	if !safety.AllowedHostname(host) {
+		http.Error(w, "invalid host", http.StatusBadRequest)
 		return
 	}
 
-	_, _ = w.Write(out)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ping diagnostics are disabled\n"))
 }
 
 func SafeDiagnosticPing(w http.ResponseWriter, r *http.Request) {
