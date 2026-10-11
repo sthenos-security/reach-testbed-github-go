@@ -16,6 +16,13 @@ on:
         description: Use real for full Reachable execution, or nop for CI integration smoke tests without scanner or Copilot dispatch
         type: string
         default: "real"
+      reachable_source_ref:
+        description: >-
+          Optional. reach-core ref (branch/tag/SHA) to install Reachable FROM
+          SOURCE, skipping the posted wheel. Empty (default) keeps today's
+          wheel install. Needs the REACH_CORE_TOKEN repo secret.
+        type: string
+        default: ""
 
 permissions:
   actions: write
@@ -56,4 +63,5 @@ jobs:
       require_ai: true
       fresh_scan: true
       reachable_dist_repo: "sthenos-security/reach-dist"
+      reachable_source_ref: ${{ inputs.reachable_source_ref }}
     secrets: inherit
