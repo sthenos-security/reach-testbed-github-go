@@ -23,6 +23,18 @@ def _load_module(path: Path, name: str):
     return module
 
 
+def _read_text_within(root: Path, candidate: Path) -> str:
+    resolved_root = root.resolve(strict=True)
+    resolved_candidate = candidate.resolve(strict=True)
+    try:
+        resolved_candidate.relative_to(resolved_root)
+    except ValueError as exc:
+        raise ValueError("path escapes its expected directory") from exc
+    if not resolved_candidate.is_file():
+        raise ValueError("expected a regular file")
+    return resolved_candidate.read_text(encoding="utf-8")
+
+
 def main() -> int:
     mod = _load_module(MODULE_PATH, "build_pages_summary")
     sanitizer = _load_module(SANITIZE_PATH, "sanitize_sarif_for_upload")
@@ -35,7 +47,7 @@ def main() -> int:
                 "logicalLocation": {"name": "handler"},
                 "physicalLocation": {
                     "artifactLocation": {
-                        "uri": "/home/runner/work/reach-testbed-github-go/reach-testbed-github-go/internal/handlers/cwe.go"
+                        "uri": "/home/runner/work/_actions/reach-testbed-github-go/internal/handlers/cwe.go"
                     },
                     "region": {"startLine": 12},
                 },
@@ -93,9 +105,26 @@ def main() -> int:
     assert expected_stats["filtered_fixture_evidence"] == 7
 
     with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "reachable-code-scanning.sarif"
+        temp_root = Path(tmp)
+        safe_file = temp_root / "safe.txt"
+        safe_file.write_text("safe", encoding="utf-8")
+        assert _read_text_within(temp_root, safe_file) == "safe"
+        outside_file = temp_root.parent / f"{temp_root.name}-outside.txt"
+        outside_file.write_text("outside", encoding="utf-8")
+        escape = temp_root / "escape.txt"
+        escape.symlink_to(outside_file)
+        try:
+            _read_text_within(temp_root, escape)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("symlink escaping the expected directory was read")
+        finally:
+            outside_file.unlink(missing_ok=True)
+
+        path = temp_root / "reachable-code-scanning.sarif"
         path.write_text(json.dumps(sarif), encoding="utf-8")
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(_read_text_within(temp_root, path))
         removed = sanitizer.sanitize(data)
         assert removed == 1
         assert "logicalLocation" not in data["runs"][0]["results"][0]["locations"][0]

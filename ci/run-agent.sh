@@ -83,7 +83,17 @@ case "$AGENT" in
       echo "REACHABLE_AGENT_RUN_COMMAND is required when AGENT=custom." >&2
       exit 2
     fi
-    PROMPT_PATH="$PROMPT_PATH" bash -lc "$REACHABLE_AGENT_RUN_COMMAND"
+    if [[ "$REACHABLE_AGENT_RUN_COMMAND" == *$'\n'* ]]; then
+      echo "REACHABLE_AGENT_RUN_COMMAND must be a single argv command." >&2
+      exit 2
+    fi
+    custom_command=()
+    read -r -a custom_command <<< "$REACHABLE_AGENT_RUN_COMMAND"
+    if ((${#custom_command[@]} == 0)) || ! command -v "${custom_command[0]}" >/dev/null 2>&1; then
+      echo "REACHABLE_AGENT_RUN_COMMAND must start with an installed command." >&2
+      exit 2
+    fi
+    PROMPT_PATH="$PROMPT_PATH" "${custom_command[@]}"
     ;;
 
   *)

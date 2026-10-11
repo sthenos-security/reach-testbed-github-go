@@ -43,6 +43,18 @@ def _write_expected(path: Path) -> None:
     )
 
 
+def _read_text_within(root: Path, candidate: Path) -> str:
+    resolved_root = root.resolve(strict=True)
+    resolved_candidate = candidate.resolve(strict=True)
+    try:
+        resolved_candidate.relative_to(resolved_root)
+    except ValueError as exc:
+        raise ValueError("path escapes its expected directory") from exc
+    if not resolved_candidate.is_file():
+        raise ValueError("expected a regular file")
+    return resolved_candidate.read_text(encoding="utf-8")
+
+
 def _write_db(
     db_path: Path,
     *,
@@ -264,8 +276,10 @@ def _run_case(
         shutil.rmtree(after_dir)
     (reports / "baseline" / "scan-path.txt").write_text(str(baseline_dir), encoding="utf-8")
     (reports / "after-final" / "scan-path.txt").write_text(str(after_dir), encoding="utf-8")
-    env = os.environ.copy()
-    env["REACHABLE_EXPECTED_CONTRACT"] = str(expected_path)
+    env = {
+        "PATH": os.defpath,
+        "REACHABLE_EXPECTED_CONTRACT": str(expected_path),
+    }
     result = subprocess.run(
         [sys.executable, str(CHECKER), str(artifact_dir)],
         cwd=ROOT,
@@ -277,7 +291,7 @@ def _run_case(
     )
     print(result.stdout, end="")
     print(result.stderr, end="", file=sys.stderr)
-    verdict = json.loads((artifact_dir / "db-remediation-verdict.json").read_text(encoding="utf-8"))
+    verdict = json.loads(_read_text_within(artifact_dir, artifact_dir / "db-remediation-verdict.json"))
     if blocking_after or not baseline_present:
         return 0 if result.returncode == 3 and not verdict["clean"] else 1
     return 0 if result.returncode == 0 and verdict["clean"] else 1
@@ -289,6 +303,22 @@ def main() -> int:
         return 2
     with tempfile.TemporaryDirectory(prefix="reachable-db-proof-") as raw:
         tmp = Path(raw)
+        safe_file = tmp / "safe.txt"
+        safe_file.write_text("safe", encoding="utf-8")
+        assert _read_text_within(tmp, safe_file) == "safe"
+        outside_file = tmp.parent / f"{tmp.name}-outside.txt"
+        outside_file.write_text("outside", encoding="utf-8")
+        escape = tmp / "escape.txt"
+        escape.symlink_to(outside_file)
+        try:
+            _read_text_within(tmp, escape)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("symlink escaping the expected directory was read")
+        finally:
+            outside_file.unlink(missing_ok=True)
+
         expected_path = tmp / "expected.json"
         _write_expected(expected_path)
         pass_status = _run_case(

@@ -1,17 +1,25 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"os/exec"
+	"strings"
 
 	"github.com/reachable/reach-testbed-github-go/internal/safety"
 )
 
 func DiagnosticPing(w http.ResponseWriter, r *http.Request) {
 	host := r.URL.Query().Get("host")
-	out, err := exec.Command("sh", "-c", "ping -c 1 "+host).CombinedOutput()
+	if !safety.AllowedHostname(host) || strings.HasPrefix(host, "-") {
+		http.Error(w, "invalid host", http.StatusBadRequest)
+		return
+	}
+
+	out, err := exec.Command("ping", "-c", "1", host).CombinedOutput()
 	if err != nil {
-		http.Error(w, string(out), http.StatusBadGateway)
+		log.Printf("diagnostic ping failed request_id=%q error=%q", r.Header.Get("X-Request-ID"), err.Error())
+		http.Error(w, "internal error", http.StatusBadGateway)
 		return
 	}
 
@@ -20,14 +28,15 @@ func DiagnosticPing(w http.ResponseWriter, r *http.Request) {
 
 func SafeDiagnosticPing(w http.ResponseWriter, r *http.Request) {
 	host := r.URL.Query().Get("host")
-	if !safety.AllowedHostname(host) {
+	if !safety.AllowedHostname(host) || strings.HasPrefix(host, "-") {
 		http.Error(w, "invalid host", http.StatusBadRequest)
 		return
 	}
 
 	out, err := exec.Command("ping", "-c", "1", host).CombinedOutput()
 	if err != nil {
-		http.Error(w, string(out), http.StatusBadGateway)
+		log.Printf("safe diagnostic ping failed request_id=%q error=%q", r.Header.Get("X-Request-ID"), err.Error())
+		http.Error(w, "internal error", http.StatusBadGateway)
 		return
 	}
 
