@@ -17,7 +17,18 @@ CHECKER = ROOT / "ci" / "check-db-remediation-proof.py"
 EXPECTED = ROOT / "expected" / "baseline.json"
 
 
-def _write_expected(path: Path) -> None:
+def _safe_child_path(root: Path, path: Path) -> Path:
+    resolved_root = root.resolve(strict=True)
+    if path.is_symlink():
+        raise ValueError("temporary artifact must not be a symlink")
+    resolved_path = path.resolve()
+    if resolved_path == resolved_root or resolved_root not in resolved_path.parents:
+        raise ValueError("temporary artifact escaped its directory")
+    return resolved_path
+
+
+def _write_expected(path: Path, root: Path) -> None:
+    path = _safe_child_path(root, path)
     path.write_text(
         json.dumps(
             {
@@ -290,7 +301,18 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="reachable-db-proof-") as raw:
         tmp = Path(raw)
         expected_path = tmp / "expected.json"
-        _write_expected(expected_path)
+        _write_expected(expected_path, tmp)
+        outside = tmp.parent / f"{tmp.name}-outside"
+        outside.write_text("do not overwrite", encoding="utf-8")
+        link = tmp / "expected-link.json"
+        link.symlink_to(outside)
+        try:
+            _write_expected(link, tmp)
+            raise AssertionError("symlink target outside temporary root was accepted")
+        except ValueError:
+            pass
+        assert outside.read_text(encoding="utf-8") == "do not overwrite"
+        outside.unlink()
         pass_status = _run_case(
             tmp,
             expected_path=expected_path,

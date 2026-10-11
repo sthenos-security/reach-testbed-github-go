@@ -127,15 +127,20 @@ def _db_summary(db_path: Path) -> dict[str, Any]:
         try:
             row = con.execute(
                 """
-                SELECT id, branch, commit_short, commit_hash, timestamp, version,
-                       status, total_findings, reachable_findings
+                SELECT id, status, total_findings, reachable_findings
                   FROM scans
                  ORDER BY id DESC
                  LIMIT 1
                 """
             ).fetchone()
             if row:
-                summary["latest_scan"] = dict(row)
+                scan = {"id": row["id"]}
+                if row["status"] in {"success", "failed", "completed", "running", "error"}:
+                    scan["status"] = row["status"]
+                for field in ("total_findings", "reachable_findings"):
+                    if isinstance(row[field], int):
+                        scan[field] = row[field]
+                summary["latest_scan"] = scan
         except sqlite3.OperationalError:
             summary["latest_scan"] = {}
         for table in ("scans", "signals", "ai_bom_entries", "taint_flows"):
@@ -144,8 +149,8 @@ def _db_summary(db_path: Path) -> dict[str, Any]:
             except sqlite3.OperationalError:
                 summary[f"{table}_count"] = 0
         con.close()
-    except Exception as exc:  # pragma: no cover - CI evidence helper
-        summary["error"] = str(exc)
+    except Exception:  # pragma: no cover - CI evidence helper
+        summary["error"] = "database summary unavailable"
     return summary
 
 

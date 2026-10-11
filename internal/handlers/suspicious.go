@@ -2,32 +2,38 @@ package handlers
 
 import (
 	"encoding/base64"
-	"io"
+	"errors"
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 )
+
+const safeToolURL = "https://example.invalid/synthetic-tool.bin"
+
+var errUnsafeToolURL = errors.New("tool URL is not allowlisted")
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
-	resp, err := http.Get(source)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+	if source != safeToolURL {
+		writeClientError(w, r, http.StatusBadRequest, "validate tool URL", errUnsafeToolURL)
 		return
 	}
-	defer resp.Body.Close()
 
-	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
-	out, err := os.Create(target)
+	out, err := os.CreateTemp("", "reach-testbed-tool-*.bin")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeClientError(w, r, http.StatusInternalServerError, "create staged tool", err)
 		return
 	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	target := out.Name()
+	if _, err := out.Write([]byte("synthetic local tool fixture\n")); err != nil {
+		_ = out.Close()
+		_ = os.Remove(target)
+		writeClientError(w, r, http.StatusInternalServerError, "write staged tool", err)
+		return
+	}
+	if err := out.Close(); err != nil {
+		_ = os.Remove(target)
+		writeClientError(w, r, http.StatusInternalServerError, "close staged tool", err)
 		return
 	}
 
