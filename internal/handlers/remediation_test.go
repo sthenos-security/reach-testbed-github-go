@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,6 +15,15 @@ import (
 	"strings"
 	"testing"
 )
+
+type requestRecorder struct {
+	requests int
+}
+
+func (recorder *requestRecorder) RoundTrip(*http.Request) (*http.Response, error) {
+	recorder.requests++
+	return nil, errors.New("unexpected outbound HTTP request")
+}
 
 func handlerRequest(handler http.HandlerFunc, method, target, body string) *httptest.ResponseRecorder {
 	request := httptest.NewRequest(method, target, strings.NewReader(body))
@@ -22,6 +34,11 @@ func handlerRequest(handler http.HandlerFunc, method, target, body string) *http
 
 func TestAIHandlersKeepRequestContentLocal(t *testing.T) {
 	const privateInput = "PRIVATE-CONTENT-DO-NOT-LEAK-83917"
+	transport := &requestRecorder{}
+	originalTransport := http.DefaultTransport
+	http.DefaultTransport = transport
+	defer func() { http.DefaultTransport = originalTransport }()
+
 	tests := []struct {
 		name    string
 		handler http.HandlerFunc
@@ -63,6 +80,9 @@ func TestAIHandlersKeepRequestContentLocal(t *testing.T) {
 	if payload["tool_spec"] == "" || payload["system_prompt"] == "" {
 		t.Fatalf("valid request did not preserve the response shape: %#v", payload)
 	}
+	if transport.requests != 0 {
+		t.Fatalf("AI handlers made %d outbound HTTP requests", transport.requests)
+	}
 }
 
 func TestAIHandlerRejectsMalformedRequestWithoutLeakingDetails(t *testing.T) {
@@ -74,6 +94,11 @@ func TestAIHandlerRejectsMalformedRequestWithoutLeakingDetails(t *testing.T) {
 }
 
 func TestSupportExportRedactsSensitiveFields(t *testing.T) {
+	var logs bytes.Buffer
+	originalLogOutput := log.Writer()
+	log.SetOutput(&logs)
+	defer log.SetOutput(originalLogOutput)
+
 	response := handlerRequest(SupportExport, http.MethodGet, "/", "")
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
@@ -88,6 +113,11 @@ func TestSupportExportRedactsSensitiveFields(t *testing.T) {
 	for _, field := range rows[1][1:] {
 		if field != "REDACTED" {
 			t.Fatalf("export field was not redacted: %#v", rows[1])
+		}
+	}
+	for _, sensitive := range []string{"123-45-6789", "1978-04-23", "avery@example.invalid"} {
+		if strings.Contains(logs.String(), sensitive) {
+			t.Fatalf("support export log exposed %q", sensitive)
 		}
 	}
 }
