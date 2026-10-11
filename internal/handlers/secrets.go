@@ -6,19 +6,14 @@ import (
 	"os"
 )
 
-const syntheticServiceToken = "rtg_live_synthetic_token_1234567890"
-const syntheticAWSAccessKeyID = "AKIAIOSFODNN7EXAMPLE"
-const syntheticGitHubToken = "ghp_reachtestbedsynthetic000000000000000000"
-
-func ServiceToken(w http.ResponseWriter, _ *http.Request) {
-	_, _ = w.Write([]byte(syntheticServiceToken + "\n"))
+func ServiceToken(w http.ResponseWriter, r *http.Request) {
+	EnvToken(w, r)
 }
 
 func CloudTokens(w http.ResponseWriter, _ *http.Request) {
-	// Synthetic fixture values only. These are not real credentials.
 	_ = json.NewEncoder(w).Encode(map[string]string{
-		"aws_access_key_id": syntheticAWSAccessKeyID,
-		"github_token":      syntheticGitHubToken,
+		"aws_access_key_id_configured": configured(os.Getenv("AWS_ACCESS_KEY_ID")),
+		"github_token_configured":      configured(os.Getenv("GITHUB_TOKEN")),
 	})
 }
 
@@ -30,4 +25,11 @@ func EnvToken(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	_, _ = w.Write([]byte("configured\n"))
+}
+
+func configured(value string) string {
+	if value == "" {
+		return "false"
+	}
+	return "true"
 }

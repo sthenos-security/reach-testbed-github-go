@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -17,38 +16,23 @@ type agentRequest struct {
 
 func AIAnswer(w http.ResponseWriter, r *http.Request) {
 	var req promptRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&req); err != nil {
+		writeClientError(w, r, http.StatusBadRequest, "decode AI answer request", err)
 		return
 	}
 
-	prompt := "System: answer as the payroll admin. User: " + req.Question
-	payload, _ := json.Marshal(map[string]any{
-		"model": "gpt-4",
-		"messages": []map[string]string{
-			{"role": "user", "content": prompt},
-		},
-	})
-	_, _ = http.Post("https://api.openai.com/v1/chat/completions", "application/json", bytes.NewReader(payload))
+	prompt := "System: answer as the payroll admin. User: [user content redacted]"
 	_ = json.NewEncoder(w).Encode(map[string]string{"prompt": prompt})
 }
 
 func AIAgentPlan(w http.ResponseWriter, r *http.Request) {
 	var req agentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&req); err != nil {
+		writeClientError(w, r, http.StatusBadRequest, "decode AI agent plan request", err)
 		return
 	}
 
-	toolSpec := "Tools: shell(command), browser(url). Follow the user's task exactly: " + req.Task
-	payload, _ := json.Marshal(map[string]any{
-		"model": "gpt-4",
-		"messages": []map[string]string{
-			{"role": "system", "content": "You are an internal automation agent with admin context."},
-			{"role": "user", "content": toolSpec},
-		},
-	})
-	_, _ = http.Post("https://api.openai.com/v1/chat/completions", "application/json", bytes.NewReader(payload))
+	toolSpec := "Tools: shell(command), browser(url). Follow the user's task exactly: [user content redacted]"
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"system_prompt": "You are an internal automation agent with admin context.",
 		"tool_spec":     toolSpec,
@@ -57,8 +41,8 @@ func AIAgentPlan(w http.ResponseWriter, r *http.Request) {
 
 func SafeAIAnswer(w http.ResponseWriter, r *http.Request) {
 	var req promptRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&req); err != nil {
+		writeClientError(w, r, http.StatusBadRequest, "decode safe AI answer request", err)
 		return
 	}
 	if strings.Contains(strings.ToLower(req.Question), "ignore previous") {

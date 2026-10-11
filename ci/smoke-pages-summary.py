@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import sqlite3
 import tempfile
 from pathlib import Path
 
@@ -12,6 +14,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "ci" / "build-pages-summary.py"
 SANITIZE_PATH = ROOT / "ci" / "sanitize-sarif-for-upload.py"
+CACHE_EVIDENCE_PATH = ROOT / "ci" / "reachable-cache-evidence.py"
+
+
+def _safe_child_path(root: Path, path: Path) -> Path:
+    resolved_root = root.resolve(strict=True)
+    if path.is_symlink():
+        raise ValueError("temporary artifact must not be a symlink")
+    resolved_path = path.resolve()
+    if resolved_path == resolved_root or resolved_root not in resolved_path.parents:
+        raise ValueError("temporary artifact escaped its directory")
+    return resolved_path
 
 
 def _load_module(path: Path, name: str):
@@ -26,6 +39,7 @@ def _load_module(path: Path, name: str):
 def main() -> int:
     mod = _load_module(MODULE_PATH, "build_pages_summary")
     sanitizer = _load_module(SANITIZE_PATH, "sanitize_sarif_for_upload")
+    cache_evidence = _load_module(CACHE_EVIDENCE_PATH, "reachable_cache_evidence")
     defended_result = {
         "ruleId": "CWE/78",
         "level": "error",
@@ -51,7 +65,16 @@ def main() -> int:
             }
         ]
     }
-    summary = mod._summarize(sarif=sarif, ledger={}, compliance={})
+    repository_env = {
+        name: os.environ.pop(name, None)
+        for name in ("GITHUB_REPOSITORY", "CI_PROJECT_NAME")
+    }
+    try:
+        summary = mod._summarize(sarif=sarif, ledger={}, compliance={})
+    finally:
+        for name, value in repository_env.items():
+            if value is not None:
+                os.environ[name] = value
     assert summary["top_priority"] == [], "defended rows must not appear in exploitable/reachable priority"
     assert len(summary["top_defended"]) == 1, "defended rows should stay in defended section"
     assert summary["top_defended"][0]["location"] == "internal/handlers/cwe.go:12"
@@ -93,12 +116,49 @@ def main() -> int:
     assert expected_stats["filtered_fixture_evidence"] == 7
 
     with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "reachable-code-scanning.sarif"
+        root = Path(tmp).resolve()
+        path = _safe_child_path(root, root / "reachable-code-scanning.sarif")
         path.write_text(json.dumps(sarif), encoding="utf-8")
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(_safe_child_path(root, path).read_text(encoding="utf-8"))
         removed = sanitizer.sanitize(data)
         assert removed == 1
         assert "logicalLocation" not in data["runs"][0]["results"][0]["locations"][0]
+
+        outside = Path(tmp).parent / f"{Path(tmp).name}-outside"
+        outside.write_text("do not read", encoding="utf-8")
+        link = root / "outside-link"
+        link.symlink_to(outside)
+        try:
+            _safe_child_path(root, link)
+            raise AssertionError("symlink target outside temporary root was accepted")
+        except ValueError:
+            pass
+        outside.unlink()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        database = Path(tmp) / "repo.db"
+        with sqlite3.connect(database) as connection:
+            connection.execute(
+                """CREATE TABLE scans (
+                    id INTEGER, branch TEXT, commit_short TEXT, commit_hash TEXT,
+                    timestamp TEXT, version TEXT, status TEXT,
+                    total_findings INTEGER, reachable_findings INTEGER
+                )"""
+            )
+            connection.execute(
+                """INSERT INTO scans VALUES (
+                    1, 'person@example.invalid', 'personal-branch', 'sensitive-hash',
+                    '2026-01-01', '1.0', 'completed', 7, 3
+                )"""
+            )
+        scan = cache_evidence._db_summary(database)["latest_scan"]
+        assert scan == {
+            "id": 1,
+            "status": "completed",
+            "total_findings": 7,
+            "reachable_findings": 3,
+        }
+        assert "person@example.invalid" not in json.dumps(scan)
 
     print("Pages summary smoke passed")
     return 0
