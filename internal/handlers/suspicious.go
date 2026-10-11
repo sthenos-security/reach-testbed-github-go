@@ -2,8 +2,9 @@ package handlers
 
 import (
 	"encoding/base64"
-	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,23 +12,18 @@ import (
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
-	resp, err := http.Get(source)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+	parsed, err := url.Parse(source)
+	if err != nil || parsed.Scheme != "https" || parsed.Host != "tools.example.invalid" ||
+		parsed.Path != "/reach-testbed-tool.bin" || parsed.RawQuery != "" ||
+		parsed.Fragment != "" || parsed.User != nil || parsed.String() != source {
+		http.Error(w, "invalid tool URL", http.StatusBadRequest)
 		return
 	}
-	defer resp.Body.Close()
 
 	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
-	out, err := os.Create(target)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := os.WriteFile(target, []byte("Reachable local tool fixture\n"), 0600); err != nil {
+		log.Printf("stage local tool fixture failed request_id=%q error=%q", r.Header.Get("X-Request-ID"), err.Error())
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
