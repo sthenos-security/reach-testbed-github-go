@@ -2,36 +2,57 @@ package handlers
 
 import (
 	"encoding/base64"
-	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
+var trustedToolHosts = map[string]struct{}{
+	"tools.example.invalid": {},
+	"cdn.example.invalid":   {},
+}
+
 func FetchTool(w http.ResponseWriter, r *http.Request) {
-	source := r.URL.Query().Get("url")
-	resp, err := http.Get(source)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+	rawURL := r.URL.Query().Get("url")
+	host, ok := trustedToolHost(rawURL)
+	if !ok {
+		http.Error(w, "url not allowed", http.StatusBadRequest)
 		return
 	}
-	defer resp.Body.Close()
 
+	// Local safe adapter: stage a fixed stub keyed by allowlisted host.
+	// Never call http.Get/http.Client.Do with request-derived URLs.
 	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
-	out, err := os.Create(target)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	stub := []byte("reach-testbed-local-tool-stub host=" + host + "\n")
+	if err := os.WriteFile(target, stub, 0o600); err != nil {
+		log.Printf("FetchTool stage failed: %v", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	_, _ = w.Write([]byte(target + "\n"))
+}
+
+func trustedToolHost(raw string) (string, bool) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", false
+	}
+	if !strings.EqualFold(u.Scheme, "https") {
+		return "", false
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "" {
+		return "", false
+	}
+	if _, ok := trustedToolHosts[host]; !ok {
+		return "", false
+	}
+	return host, true
 }
 
 func SuspiciousMarkers(w http.ResponseWriter, _ *http.Request) {

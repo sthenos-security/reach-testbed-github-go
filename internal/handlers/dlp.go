@@ -1,22 +1,18 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 )
 
 func SupportExport(w http.ResponseWriter, _ *http.Request) {
-	ssn := "123-45-6789"
-	dob := "1978-04-23"
-	log.Printf("Processing patient ssn=%s dob=%s", ssn, dob)
-	payload, _ := json.Marshal(map[string]string{"ssn": ssn, "dob": dob})
-	_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
+	// Local audit only — no raw PII constants, logs, or outbound analytics POST.
+	log.Printf("Processing patient export request")
 
 	w.Header().Set("Content-Type", "text/csv")
-	_, _ = w.Write([]byte("name,email,ssn,phone,card_number,last4\n"))
-	_, _ = w.Write([]byte("Avery Example,avery@example.invalid," + ssn + ",+1-415-555-0199,4111111111111111,4242\n"))
+	_, _ = w.Write([]byte(redactedSupportExportCSV()))
 }
 
 func SupportProfile(w http.ResponseWriter, _ *http.Request) {
@@ -30,4 +26,11 @@ func SupportProfile(w http.ResponseWriter, _ *http.Request) {
 		"account_number":  "000123456789",
 		"passport_number": "X12345678",
 	})
+}
+
+func redactedSupportExportCSV() string {
+	var b strings.Builder
+	b.WriteString("name,email,ssn,phone,card_number,last4\n")
+	b.WriteString("Avery Example,[REDACTED],[REDACTED],[REDACTED],[REDACTED],4242\n")
+	return b.String()
 }
