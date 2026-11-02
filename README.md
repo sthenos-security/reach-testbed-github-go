@@ -232,12 +232,8 @@ GitHub Actions:
 | Script | Used for | Release-gate purpose |
 |--------|----------|----------------------|
 | [ci/smoke-db-remediation-proof.py](ci/smoke-db-remediation-proof.py) | Preflight smoke test | Verifies the DB proof/verdict helper can run before the expensive scan begins. |
-| [ci/reachable-cache-evidence.py](ci/reachable-cache-evidence.py) | Cache telemetry | Records whether the Reachable cache was restored, reused, or created fresh. |
-| [ci/collect-reachable-report.sh](ci/collect-reachable-report.sh) | Artifact collection | Collects the latest Reachable scan outputs into `.reachable/ci-artifacts`. |
 | [ci/check-db-release-blockers.py](ci/check-db-release-blockers.py) | Baseline gate | Reads the scan database and checks that the vulnerable branch matches the expected release-blocker contract. |
-| [ci/write-remediation-ledger.py](ci/write-remediation-ledger.py) | Remediation audit | Writes a sanitized remediation ledger without publishing prompts, rules, transcripts, or raw databases. |
 | [ci/write-agent-audit-log.py](ci/write-agent-audit-log.py) | Agent parity audit | Writes sanitized Copilot PR and cross-agent parity audit artifacts with selected signals, changed files, test evidence, and post-fix blocker counts. |
-| [ci/run-agent.sh](ci/run-agent.sh) | Agent execution | Invokes the selected coding agent against the bounded remediation task. |
 | [ci/check-db-remediation-proof.py](ci/check-db-remediation-proof.py) | Proof gate | Reads the proof scan database and fails unless release blockers are gone. |
 | [ci/sanitize-sarif-for-upload.py](ci/sanitize-sarif-for-upload.py) | Platform export hygiene | Sanitizes the SARIF compatibility export before upload; SARIF is not the source of truth. |
 | [ci/build-pages-summary.py](ci/build-pages-summary.py) | Public evidence page | Builds the sanitized Pages report from DB-backed evidence and workflow metadata. |
