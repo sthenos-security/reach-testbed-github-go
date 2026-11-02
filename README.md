@@ -232,7 +232,6 @@ GitHub Actions:
 | Script | Used for | Release-gate purpose |
 |--------|----------|----------------------|
 | [ci/smoke-db-remediation-proof.py](ci/smoke-db-remediation-proof.py) | Preflight smoke test | Verifies the DB proof/verdict helper can run before the expensive scan begins. |
-| [ci/check-db-release-blockers.py](ci/check-db-release-blockers.py) | Baseline gate | Reads the scan database and checks that the vulnerable branch matches the expected release-blocker contract. |
 | [ci/write-agent-audit-log.py](ci/write-agent-audit-log.py) | Agent parity audit | Writes sanitized Copilot PR and cross-agent parity audit artifacts with selected signals, changed files, test evidence, and post-fix blocker counts. |
 | [ci/check-db-remediation-proof.py](ci/check-db-remediation-proof.py) | Proof gate | Reads the proof scan database and fails unless release blockers are gone. |
 | [ci/sanitize-sarif-for-upload.py](ci/sanitize-sarif-for-upload.py) | Platform export hygiene | Sanitizes the SARIF compatibility export before upload; SARIF is not the source of truth. |
