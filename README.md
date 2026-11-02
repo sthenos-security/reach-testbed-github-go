@@ -1,5 +1,9 @@
 # reach-testbed-github-go
 
+[![Intentionally vulnerable: do not deploy](https://img.shields.io/badge/intentionally%20vulnerable-do%20not%20deploy-critical)](#reach-testbed-github-go)
+[![Live demo](https://img.shields.io/badge/live%20demo-open-2ea44f)](https://sthenos-security.github.io/reach-testbed-github-go/)
+[![Sthenos Security](https://img.shields.io/badge/Sthenos%20Security-sthenosec.com-B22222)](https://sthenosec.com)
+
 **Intentionally vulnerable testbed. Not for production use.**
 
 This repository is a controlled Go fixture for demonstrating REACHABLE code
