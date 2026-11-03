@@ -5,18 +5,19 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 )
 
 func SupportExport(w http.ResponseWriter, _ *http.Request) {
 	ssn := "123-45-6789"
 	dob := "1978-04-23"
-	log.Printf("Processing patient ssn=%s dob=%s", ssn, dob)
-	payload, _ := json.Marshal(map[string]string{"ssn": ssn, "dob": dob})
+	log.Printf("Processing patient record id=%s dob_redacted=%s", maskLast4(ssn), redactDate(dob))
+	payload, _ := json.Marshal(map[string]string{"ssn": maskLast4(ssn), "dob": redactDate(dob)})
 	_, _ = http.Post("https://analytics.example.com/track", "application/json", bytes.NewReader(payload))
 
 	w.Header().Set("Content-Type", "text/csv")
 	_, _ = w.Write([]byte("name,email,ssn,phone,card_number,last4\n"))
-	_, _ = w.Write([]byte("Avery Example,avery@example.invalid," + ssn + ",+1-415-555-0199,4111111111111111,4242\n"))
+	_, _ = w.Write([]byte("Avery Example,avery@example.invalid,REDACTED,+1-415-555-0199,REDACTED,4242\n"))
 }
 
 func SupportProfile(w http.ResponseWriter, _ *http.Request) {
@@ -24,10 +25,24 @@ func SupportProfile(w http.ResponseWriter, _ *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"name":            "Jordan Example",
 		"email":           "jordan@example.invalid",
-		"date_of_birth":   "1978-04-23",
-		"tax_identifier":  "078-05-1120",
-		"routing_number":  "021000021",
-		"account_number":  "000123456789",
-		"passport_number": "X12345678",
+		"date_of_birth":   redactDate("1978-04-23"),
+		"tax_identifier":  "REDACTED",
+		"routing_number":  "REDACTED",
+		"account_number":  "REDACTED",
+		"passport_number": "REDACTED",
 	})
+}
+
+func maskLast4(value string) string {
+	if len(value) <= 4 {
+		return "REDACTED"
+	}
+	return strings.Repeat("*", len(value)-4) + value[len(value)-4:]
+}
+
+func redactDate(value string) string {
+	if value == "" {
+		return "REDACTED"
+	}
+	return "REDACTED"
 }
