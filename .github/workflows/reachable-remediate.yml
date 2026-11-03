@@ -51,7 +51,7 @@ jobs:
 
   reachable-auto-remediation:
     needs: validate-dispatch-ref
-    uses: sthenos-security/reach-ci-github/.github/workflows/auto-remediate.yml@v1.1.0
+    uses: sthenos-security/reach-ci-github/.github/workflows/auto-remediate.yml@v1.1.1
     with:
       target_branch: ${{ inputs.target_branch }}
       remediate: ${{ inputs.remediate }}
